@@ -30,28 +30,29 @@ export const AuthProvider = ({ children }) => {
           let data = null;
           let perms = [];
 
-          // 1. Try 'users' collection
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          // Fetch from both collections in parallel to save time
+          const [userDoc, staffDoc] = await Promise.all([
+            getDoc(doc(db, 'users', firebaseUser.uid)),
+            getDoc(doc(db, 'staff', firebaseUser.uid))
+          ]);
+
           if (userDoc.exists()) {
             data = userDoc.data();
-          } else {
-            // 2. Try 'staff' collection
-            const staffDoc = await getDoc(doc(db, 'staff', firebaseUser.uid));
-            if (staffDoc.exists()) {
-              data = staffDoc.data();
-            }
+          } else if (staffDoc.exists()) {
+            data = staffDoc.data();
           }
 
-          // 3. Handle data if found
+          // Handle data and fetch roles if needed
           if (data) {
             if (data.role_id) {
               const roleDoc = await getDoc(doc(db, 'roles', String(data.role_id)));
               if (roleDoc.exists()) {
-                perms = roleDoc.data().permission_ids || roleDoc.data().permissions || [];
+                const roleData = roleDoc.data();
+                perms = roleData.permission_ids || roleData.permissions || [];
               }
             }
           } else {
-            // 4. Fallback for new Auth users not in Firestore yet
+            // Fallback for Super Admins not yet in Firestore
             data = { role_title: 'Super Admin', role_id: 6 };
             perms = ["dashboard", "staff_management", "all_staff", "restaurant", "access"];
           }
