@@ -27,8 +27,18 @@ function PrivateRoute({ children }) {
   return user ? children : <Navigate to="/login" replace />;
 }
 
+import { useEffect } from "react";
+import { performAttendanceCleanup } from "./utils/cleanup";
+
 export default function App() {
   const { user, userData, perms } = useAuth();
+
+  useEffect(() => {
+    // Run cleanup once when an Admin (or authorized staff) logs in
+    if (user && (perms?.includes("all_staff") || perms?.includes("dashboard"))) {
+      performAttendanceCleanup();
+    }
+  }, [user, perms]);
 
   return (
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Store, Phone, Mail, MapPin, Calendar, Clock, 
-  Save, Loader2, Plus, Trash2, Shield, Building2, Map as MapIcon
+  Save, Loader2, Plus, Trash2, Shield, Building2, Map as MapIcon, ChevronDown
 } from "lucide-react";
 import { db } from "../../lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -218,15 +218,15 @@ export default function RestaurantProfile() {
   const removeTiming = (id) => setTimings(prev => prev.filter(t => t.id !== id));
   const updateTiming = (id, updates) => setTimings(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
 
-  if (loading) return <div className="h-screen bg-[#071428] flex items-center justify-center"><Loader2 className="animate-spin text-[#D0B079]" size={48} /></div>;
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#071428] via-[#0d1f45] to-[#071428] selection:bg-[#D0B079]/30">
       <Header onToggleSidebar={() => setSidebarOpen((s) => !s)} darkMode={true} />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${sidebarOpen ? "lg:pl-72" : "lg:pl-0"}`}>
-        <main className="-mt-10 sm:-mt-0 flex-1 pt-36 lg:pt-24 pb-12 px-4 sm:px-6 lg:px-10">
+      <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${sidebarOpen ? "lg:pl-[300px]" : "lg:pl-0"}`}>
+        <main className={`-mt-10 sm:-mt-0 flex-1 pt-36 lg:pt-24 pb-12 px-4 sm:px-6 lg:px-10 transition-all duration-500 ${sidebarOpen ? "lg:px-12" : "lg:px-20"}`}>
           <div className="max-w-5xl mx-auto">
 
             {/* Page Header */}
@@ -303,15 +303,15 @@ export default function RestaurantProfile() {
                   </div>
 
                   <div className="space-y-4 pt-4 border-t border-white/5">
-                    <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <h3 className="text-sm font-semibold tracking-wide text-[#D0B079] shrink-0">Geolocation</h3>
-                        <div className="h-px w-64 bg-gradient-to-r from-[#D0B079]/20 to-transparent"></div>
+                        <div className="hidden sm:block h-px w-32 md:w-64 bg-gradient-to-r from-[#D0B079]/20 to-transparent"></div>
                       </div>
                       <button
                         type="button"
                         onClick={fetchCurrentLocation}
-                        className="px-4 py-2 bg-white/5 hover:bg-[#D0B079]/10 border border-white/10 hover:border-[#D0B079]/30 rounded-xl text-white/70 hover:text-[#D0B079] text-xs font-bold transition-all flex items-center gap-2"
+                        className="w-full sm:w-auto px-4 py-2.5 bg-[#D0B079]/10 hover:bg-[#D0B079]/20 border border-[#D0B079]/20 hover:border-[#D0B079]/40 rounded-xl text-[#D0B079] text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-[#D0B079]/5"
                       >
                         <MapIcon size={14} />
                         Fetch My Location
@@ -387,53 +387,55 @@ export default function RestaurantProfile() {
                           : 'bg-white/[0.01] border-white/5 opacity-50 grayscale hover:grayscale-0 hover:opacity-100'
                           }`}
                       >
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8 items-end sm:items-center">
                           {/* Day Selector */}
-                          <div className="md:col-span-3 space-y-2">
-                            <label className="text-sm font-medium text-white ml-1"> Day</label>
-                            <select
-                              value={t.day}
-                              onChange={(e) => updateTiming(t.id, { day: e.target.value })}
-                              className="w-full px-4 py-3 bg-[#0b1a3d] border border-white/10 rounded-xl text-white font-medium text-sm tracking-wide focus:outline-none focus:border-[#D0B079] transition-all cursor-pointer appearance-none [&>option]:bg-[#0b1a3d]"
-                            >
-                              {WEEKDAYS.map((d) => (
-                                <option key={d} value={d} className="bg-[#0b1a3d]">
-                                  {d}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          {/* Start Time */}
-                          <div className="md:col-span-3 space-y-2">
-                            <label className="text-sm font-medium text-white ml-1">Opening Time</label>
+                          <div className="lg:col-span-3 space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-1">Day of Week</label>
                             <div className="relative">
-                              <Clock size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-yellow-400/50" />
+                              <Calendar size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#D0B079]/40" />
+                              <select
+                                value={t.day}
+                                onChange={(e) => updateTiming(t.id, { day: e.target.value })}
+                                className="w-full pl-11 pr-10 py-3 bg-white/5 border border-white/10 rounded-xl text-white font-bold text-sm tracking-wide focus:outline-none focus:border-[#D0B079] transition-all cursor-pointer appearance-none [&>option]:bg-[#0b1a3d]"
+                              >
+                                {WEEKDAYS.map((d) => (
+                                  <option key={d} value={d}>{d}</option>
+                                ))}
+                              </select>
+                              <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
+                            </div>
+                          </div>
+ 
+                          {/* Start Time */}
+                          <div className="lg:col-span-3 space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-1">Opening</label>
+                            <div className="relative">
+                              <Clock size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400/50" />
                               <input
                                 type="time"
                                 value={t.start}
                                 onChange={(e) => updateTiming(t.id, { start: e.target.value })}
-                                className="w-full pl-10 pr-4 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white font-medium text-sm focus:outline-none focus:border-[#D0B079] transition-all [color-scheme:dark]"
+                                className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white font-bold text-sm focus:outline-none focus:border-[#D0B079] transition-all [color-scheme:dark]"
                               />
                             </div>
                           </div>
-
+ 
                           {/* End Time */}
-                          <div className="md:col-span-3 space-y-2">
-                            <label className="text-sm font-medium text-white ml-1">Closing Time</label>
+                          <div className="lg:col-span-3 space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-1">Closing</label>
                             <div className="relative">
                               <Clock size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-rose-400/50" />
                               <input
                                 type="time"
                                 value={t.end}
                                 onChange={(e) => updateTiming(t.id, { end: e.target.value })}
-                                className="w-full pl-10 pr-4 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white font-medium text-sm focus:outline-none focus:border-[#D0B079] transition-all [color-scheme:dark]"
+                                className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white font-bold text-sm focus:outline-none focus:border-[#D0B079] transition-all [color-scheme:dark]"
                               />
                             </div>
                           </div>
-
+ 
                           {/* Active Toggle & Remove */}
-                          <div className="md:col-span-3 flex items-center justify-between md:justify-end gap-6">
+                          <div className="lg:col-span-3 flex items-center justify-between lg:justify-end gap-6 pt-2 lg:pt-0">
                             <label className="flex items-center gap-3 cursor-pointer group/toggle">
                               <div className="relative">
                                 <input
@@ -442,17 +444,17 @@ export default function RestaurantProfile() {
                                   checked={!!t.is_active}
                                   onChange={(e) => updateTiming(t.id, { is_active: e.target.checked })}
                                 />
-                                <div className={`w-10 h-5 rounded-full transition-colors ${t.is_active ? 'bg-[#D0B079]' : 'bg-white/10'}`}></div>
-                                <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-all ${t.is_active ? 'translate-x-5' : ''}`}></div>
+                                <div className={`w-12 h-6 rounded-full transition-colors ${t.is_active ? 'bg-emerald-500' : 'bg-white/10'}`}></div>
+                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all ${t.is_active ? 'translate-x-6' : ''}`}></div>
                               </div>
-                              <span className={`text-sm font-medium transition-colors ${t.is_active ? 'text-yellow-400' : 'text-white/60'}`}>
-                                {t.is_active ? 'Online' : 'Offline'}
+                              <span className={`text-[11px] font-black uppercase tracking-widest transition-colors ${t.is_active ? 'text-emerald-400' : 'text-white/30'}`}>
+                                {t.is_active ? 'Open' : 'Closed'}
                               </span>
                             </label>
-
+ 
                             <button
                               onClick={() => removeTiming(t.id)}
-                              className="p-3 bg-rose-500/5 hover:bg-rose-500 text-rose-500 hover:text-white rounded-xl transition-all hover:scale-110 shadow-lg border border-rose-500/10"
+                              className="p-3 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all shadow-xl border border-rose-500/20 active:scale-90"
                             >
                               <Trash2 size={18} />
                             </button>

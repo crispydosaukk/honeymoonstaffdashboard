@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { can } from "../../utils/perm";
 import { usePopup } from "../../context/PopupContext";
 import { useAuth } from "../../context/AuthContext";
+import { X } from "lucide-react";
 
 
 function isSuperAdmin() {
@@ -163,28 +164,28 @@ export default function Sidebar({ open, onClose }) {
 
       <div
         onClick={onClose}
-        className={`fixed inset-0 top-0 bg-black/50 backdrop-blur-sm lg:hidden transition-opacity ${open ? "opacity-100" : "opacity-0 pointer-events-none"
+        className={`fixed inset-0 z-[55] bg-black/60 backdrop-blur-md lg:hidden transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
       />
-
+ 
       <aside
         className={`
-          fixed left-0 bottom-0 z-[60] lg:z-40 w-[288px]
+          fixed left-0 top-0 bottom-0 z-[60] w-[300px]
           flex flex-col shadow-2xl
-          transform transition-all duration-300 ease-in-out
-          top-0 lg:top-16
+          transform transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)
+          lg:z-40 lg:top-16
           ${open ? "translate-x-0" : "-translate-x-full"}
         `}
         style={{ background: 'linear-gradient(180deg, #071428 0%, #0d1f45 55%, #071428 100%)' }}
       >
         {/* Mobile Sidebar Header (Logo + Close) */}
-        <div className="flex lg:hidden items-center justify-between px-4 pb-3 pt-10 border-b border-white/10">
-          <img src="/watanstafflogo.png" alt="Logo" className="h-14 w-auto object-contain" />
-          <button onClick={onClose} className="p-2 text-white/50 hover:text-white bg-white/10 hover:bg-white/20 rounded-xl transition-all">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
+        <div className="flex lg:hidden items-center justify-between px-6 pb-6 pt-12 border-b border-white/5">
+          <img src="/watanstafflogo.png" alt="Logo" className="h-12 w-auto object-contain" />
+          <button 
+            onClick={onClose} 
+            className="p-2.5 text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-2xl transition-all active:scale-90"
+          >
+            <X size={20} />
           </button>
         </div>
 

@@ -279,14 +279,16 @@ export default function Header({ onToggleSidebar, darkMode = true }) {
             </div>
           </div>
 
-          <div className="flex-1 flex items-center justify-center px-4">
+          <div className="flex-1 flex items-center justify-center px-2 sm:px-4 min-w-0">
             <button
               onClick={() => setIsLocationModalOpen(true)}
-              className="flex items-center gap-3 text-white bg-white/8 hover:bg-white/15 py-2 px-4 sm:px-6 rounded-xl border border-white/15 shadow-sm max-w-[420px] w-full transition-all active:scale-95"
+              className="flex items-center gap-2 sm:gap-3 text-white bg-white/8 hover:bg-white/15 py-2 px-3 sm:px-6 rounded-xl border border-white/10 shadow-sm max-w-[420px] w-full transition-all active:scale-95 group overflow-hidden"
             >
-              <MapPin size={16} className="text-[#D0B079] shrink-0" />
-              <span className="truncate text-white/85 text-sm font-medium">{locationName || "Detecting location..."}</span>
-              <ChevronDown size={14} className="text-white/40 ml-auto shrink-0" />
+              <MapPin size={14} className="text-[#D0B079] shrink-0 group-hover:animate-bounce" />
+              <span className="truncate text-white/85 text-[10px] sm:text-sm font-medium">
+                {locationName || "Detecting..."}
+              </span>
+              <ChevronDown size={12} className="text-white/20 ml-auto shrink-0 hidden xs:block" />
             </button>
           </div>
 

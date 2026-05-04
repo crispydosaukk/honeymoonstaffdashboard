@@ -309,24 +309,24 @@ export default function Dashboard() {
                 <p className="text-white/60 mt-2 text-sm tracking-wider font-medium">Real-time overview of your team's attendance and performance</p>
                 
                 {isSuper && (
-                  <div className="relative mt-6 flex items-center gap-3">
+                  <div className="relative mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-md mx-auto">
                     <button
                       onClick={() => setShowRestaurantMenu(!showRestaurantMenu)}
-                      className="flex items-center gap-3 px-6 py-3 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 text-white/80 font-semibold hover:bg-white/10 transition-all text-sm tracking-wider shadow-xl"
+                      className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-3 px-6 py-3.5 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 text-white/80 font-semibold hover:bg-white/10 transition-all text-sm tracking-wider shadow-xl group"
                     >
-                      <LayoutDashboard size={18} className="text-[#D0B079]" />
-                      <span className="min-w-[160px] text-left">
+                      <LayoutDashboard size={18} className="text-[#D0B079] group-hover:scale-110 transition-transform" />
+                      <span className="flex-1 sm:min-w-[160px] text-left">
                         {selectedRestaurant ? (restaurants.find(r => String(r.id) === String(selectedRestaurant))?.restaurant_name || "Select Restaurant") : "All Restaurants"}
                       </span>
                       <ChevronDown size={16} className={`transition-transform duration-300 ${showRestaurantMenu ? 'rotate-180' : ''}`} />
                     </button>
-
+ 
                     <button
                       onClick={() => setShowFilterModal(true)}
-                      className="flex items-center gap-3 px-6 py-3 bg-[#D0B079]/10 backdrop-blur-md rounded-2xl border border-[#D0B079]/20 text-[#D0B079] font-semibold hover:bg-[#D0B079]/20 transition-all text-sm tracking-wider shadow-xl"
+                      className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-3 px-6 py-3.5 bg-[#D0B079]/10 backdrop-blur-md rounded-2xl border border-[#D0B079]/20 text-[#D0B079] font-semibold hover:bg-[#D0B079]/20 transition-all text-sm tracking-wider shadow-xl group"
                     >
-                      <Filter size={18} />
-                      <span>{period === 'custom' ? `${dateRange.from} to ${dateRange.to}` : period.charAt(0).toUpperCase() + period.slice(1)}</span>
+                      <Filter size={18} className="group-hover:rotate-12 transition-transform" />
+                      <span className="flex-1 sm:flex-none whitespace-nowrap">{period === 'custom' ? `${dateRange.from} to ${dateRange.to}` : period.charAt(0).toUpperCase() + period.slice(1)}</span>
                     </button>
 
 

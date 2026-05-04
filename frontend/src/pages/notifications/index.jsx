@@ -13,7 +13,9 @@ import {
   collection, query, onSnapshot, addDoc, serverTimestamp, 
   where, getDocs, getDoc, deleteDoc, doc, orderBy, writeBatch
 } from "firebase/firestore";
+import { sendPushNotification } from "../../utils/fcm";
 import { usePopup } from "../../context/PopupContext";
+
 
 const NOTIFICATION_TYPES = [
   { id: "announcement", label: "Announcement", icon: MessageSquare, color: "blue", emoji: "📢" },
@@ -176,7 +178,26 @@ export default function NotificationsPage() {
         });
       });
 
-      await Promise.all(promises);
+      const results = await Promise.all(promises);
+
+      // 5. Send Push Notifications directly from Frontend
+      // (This replaces the Cloud Function logic)
+      if (!formData.scheduledFor) {
+        targetStaff.forEach((s, index) => {
+          const docRef = results[index];
+          if (s.fcmToken || s.fcm_token) {
+            sendPushNotification({
+              fcm_token: s.fcmToken || s.fcm_token,
+              title: formData.title,
+              body: formData.message,
+              priority: formData.priority,
+              type: formData.type,
+              notificationId: docRef.id
+            });
+          }
+        });
+      }
+
 
       const staffNames = targetStaff.map(s => s.full_name).join(', ');
       console.log(`[Notification] Sent to: ${staffNames}`);
@@ -252,35 +273,35 @@ export default function NotificationsPage() {
       <Header onToggleSidebar={() => setSidebarOpen(s => !s)} darkMode={true} />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className={`flex-1 flex flex-col transition-all duration-500 ease-in-out ${sidebarOpen ? "lg:pl-72" : "lg:pl-0"}`}>
-        <main className="flex-1 pt-28 pb-20 px-6 sm:px-10">
+      <div className={`flex-1 flex flex-col transition-all duration-500 ease-in-out ${sidebarOpen ? "lg:pl-[300px]" : "lg:pl-0"}`}>
+        <main className={`flex-1 pt-28 pb-20 px-6 sm:px-10 transition-all duration-500 ${sidebarOpen ? "lg:px-12" : "lg:px-20"}`}>
           <div className="max-w-7xl mx-auto">
             
             {/* Page Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 sm:mb-12">
               <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                <h1 className="text-4xl font-semibold tracking-tight text-white flex items-center gap-4">
-                  Communication Center
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white flex items-center gap-4">
+                  Communication
                 </h1>
-                <p className="text-white/40 text-base font-medium mt-2">Send messages and alerts to your restaurant teams.</p>
+                <p className="text-white/40 text-sm sm:text-base font-medium mt-1 sm:mt-2">Broadcast alerts to your restaurant teams.</p>
               </motion.div>
-
-              <div className="flex items-center gap-2 p-1 bg-white/5 border border-white/10 rounded-2xl">
+ 
+              <div className="flex items-center gap-1.5 p-1.5 bg-white/5 border border-white/10 rounded-2xl w-fit">
                 <button 
                   onClick={() => setActiveTab("create")}
-                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'create' ? 'bg-[#D0B079] text-slate-900 shadow-lg shadow-[#D0B079]/20' : 'text-white/40 hover:text-white'}`}
+                  className={`flex items-center gap-2 px-5 sm:px-8 py-2.5 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'create' ? 'bg-[#D0B079] text-slate-900 shadow-xl shadow-[#D0B079]/20' : 'text-white/40 hover:text-white'}`}
                 >
                   <Plus size={14} /> Create
                 </button>
                 <button 
                   onClick={() => setActiveTab("history")}
-                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'history' ? 'bg-[#D0B079] text-slate-900 shadow-lg shadow-[#D0B079]/20' : 'text-white/40 hover:text-white'}`}
+                  className={`flex items-center gap-2 px-5 sm:px-8 py-2.5 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-[#D0B079] text-slate-900 shadow-xl shadow-[#D0B079]/20' : 'text-white/40 hover:text-white'}`}
                 >
                   <History size={14} /> History
                 </button>
               </div>
             </div>
-
+ 
             <AnimatePresence mode="wait">
               {activeTab === "create" ? (
                 <motion.div
@@ -288,18 +309,18 @@ export default function NotificationsPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className="w-full max-w-4xl bg-white/[0.03] border border-white/[0.08] rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden"
+                  className="w-full max-w-4xl bg-white/[0.03] border border-white/[0.08] rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl relative overflow-hidden"
                 >
                   {/* Decorative background element */}
                   <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-[#D0B079]/5 rounded-full blur-[80px] pointer-events-none" />
-
-                  <div className="flex items-center gap-3 mb-10 border-b border-white/5 pb-6">
-                    <div className="p-3 bg-[#D0B079]/10 rounded-2xl">
-                      <Bell size={24} className="text-[#D0B079]" />
+ 
+                  <div className="flex items-center gap-4 mb-8 border-b border-white/5 pb-6">
+                    <div className="p-3 bg-[#D0B079]/10 rounded-2xl shrink-0">
+                      <Bell size={22} className="text-[#D0B079]" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold">Create & Send Notification</h2>
-                      <p className="text-white/30 text-xs">Define your recipients and send your notification.</p>
+                      <h2 className="text-lg sm:text-xl font-bold">New Notification</h2>
+                      <p className="text-white/30 text-[11px] sm:text-xs font-bold mt-0.5">Direct Broadcast</p>
                     </div>
                   </div>
 
@@ -307,7 +328,7 @@ export default function NotificationsPage() {
                     {/* Primary Content Section */}
                     <div className="grid grid-cols-1 gap-6">
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">Title</label>
+                        <label className="text-sm font-bold text-white/40 ml-1">Title</label>
                         <input 
                           type="text"
                           placeholder="Notification title..."
@@ -318,7 +339,7 @@ export default function NotificationsPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">Message</label>
+                        <label className="text-sm font-bold text-white/40 ml-1">Message</label>
                         <textarea 
                           placeholder="Type your message here..."
                           rows="4"
@@ -332,7 +353,7 @@ export default function NotificationsPage() {
                     {/* Configuration Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/5">
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">Target Restaurant</label>
+                        <label className="text-sm font-bold text-white/40 ml-1">Target Restaurant</label>
                         <div className="relative">
                           <Building2 size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" />
                           <select 
@@ -349,7 +370,7 @@ export default function NotificationsPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">Target Designation</label>
+                        <label className="text-sm font-bold text-white/40 ml-1">Target Designation</label>
                         <div className="relative">
                           <Briefcase size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" />
                           <select 
@@ -366,7 +387,7 @@ export default function NotificationsPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">Notification Type</label>
+                        <label className="text-sm font-bold text-white/40 ml-1">Notification Type</label>
                         <select 
                           value={formData.type}
                           onChange={(e) => setFormData({...formData, type: e.target.value})}
@@ -452,49 +473,51 @@ export default function NotificationsPage() {
                     history.slice(0, 50).map((item) => (
                       <div 
                         key={item.id}
-                        className="group bg-white/[0.02] border border-white/[0.08] hover:border-[#D0B079]/30 hover:bg-white/[0.04] p-4 rounded-2xl transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                        className="group bg-white/[0.02] border border-white/[0.08] hover:border-[#D0B079]/30 hover:bg-white/[0.04] p-5 rounded-[2rem] transition-all duration-300 flex flex-col xl:flex-row xl:items-center justify-between gap-6"
                       >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className={`p-2.5 rounded-xl ${item.priority === 'urgent' ? 'bg-rose-500/10 text-rose-400' : 'bg-white/5 text-white/40 group-hover:bg-[#D0B079]/10 group-hover:text-[#D0B079] transition-all'}`}>
-                            <MessageSquare size={18} />
+                        <div className="flex items-start gap-4 flex-1 min-w-0">
+                          <div className={`p-3 rounded-2xl shrink-0 ${item.priority === 'urgent' ? 'bg-rose-500/10 text-rose-400' : 'bg-white/5 text-white/40 group-hover:bg-[#D0B079]/10 group-hover:text-[#D0B079] transition-all'}`}>
+                            <MessageSquare size={20} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-white font-bold text-sm group-hover:text-[#D0B079] transition-colors truncate">{item.title}</h3>
-                            <p className="text-white/30 text-[11px] mt-0.5 line-clamp-1">{item.body}</p>
-                            <div className="flex items-center gap-2 mt-1.5">
-                              <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5">
-                                {item.target_group || `Sent to: ${item.recipient_count || 0} staff`}
-                              </span>
-                              <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border ${
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <h3 className="text-white font-bold text-sm sm:text-base group-hover:text-[#D0B079] transition-colors truncate">{item.title}</h3>
+                              <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${
                                 item.priority === 'urgent' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 
                                 item.priority === 'high' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 
                                 'bg-white/5 text-white/40 border-white/5'
                               }`}>
                                 {item.priority}
                               </span>
+                            </div>
+                            <p className="text-white/40 text-xs mt-0.5 line-clamp-2 leading-relaxed">{item.body}</p>
+                            <div className="flex flex-wrap items-center gap-2 mt-3">
+                              <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.15em] bg-white/5 px-2.5 py-1 rounded-md border border-white/5">
+                                {item.target_group || `Sent to: ${item.recipient_count || 0} staff`}
+                              </span>
                               {item.status === 'scheduled' ? (
-                                <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border bg-indigo-500/10 text-indigo-400 border-indigo-500/20 flex items-center gap-1">
-                                  <Clock size={8} />
+                                <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md border bg-indigo-500/10 text-indigo-400 border-indigo-500/20 flex items-center gap-1.5">
+                                  <Clock size={10} />
                                   Scheduled
                                 </span>
                               ) : (
-                                <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border bg-emerald-500/10 text-emerald-400 border-emerald-500/20 flex items-center gap-1">
-                                  <CheckCircle2 size={8} />
+                                <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md border bg-emerald-500/10 text-emerald-400 border-emerald-500/20 flex items-center gap-1.5">
+                                  <CheckCircle2 size={10} />
                                   Sent
                                 </span>
                               )}
                             </div>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-4 md:pl-4 md:border-l md:border-white/5">
-                          <div className="text-right shrink-0">
-                            <div className="text-[10px] font-bold text-white/40">
+ 
+                        <div className="flex items-center justify-between xl:justify-end gap-6 pt-4 xl:pt-0 border-t xl:border-t-0 border-white/5">
+                          <div className="text-left xl:text-right shrink-0">
+                            <div className="text-[10px] font-black text-white/40 uppercase tracking-widest">
                               {item.status === 'scheduled' && item.scheduled_for?.toDate 
                                 ? item.scheduled_for.toDate().toLocaleDateString() 
                                 : item.sent_at?.toDate ? item.sent_at.toDate().toLocaleDateString() : 'Just now'}
                             </div>
-                            <div className="text-[9px] text-white/20 mt-0.5">
+                            <div className="text-[10px] text-white/20 mt-1 font-bold">
                               {item.status === 'scheduled' && item.scheduled_for?.toDate 
                                 ? item.scheduled_for.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                                 : item.sent_at?.toDate ? item.sent_at.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
@@ -503,7 +526,7 @@ export default function NotificationsPage() {
                           <div className="flex items-center gap-2">
                             <button 
                               onClick={() => handleResend(item)}
-                              className="px-3 py-2 bg-[#D0B079]/10 text-[#D0B079] hover:bg-[#D0B079] hover:text-slate-900 rounded-lg transition-all flex items-center gap-2 text-[10px] font-bold"
+                              className="px-4 py-2.5 bg-[#D0B079]/10 text-[#D0B079] hover:bg-[#D0B079] hover:text-slate-900 rounded-xl transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
                               title="Resend this notification"
                             >
                               <RotateCcw size={12} />
@@ -511,10 +534,10 @@ export default function NotificationsPage() {
                             </button>
                             <button 
                               onClick={() => handleDeleteNotification(item)}
-                              className="p-2 bg-white/5 hover:bg-rose-500/20 text-white/20 hover:text-rose-400 rounded-lg transition-all"
+                              className="p-2.5 bg-white/5 hover:bg-rose-500/20 text-white/20 hover:text-rose-400 rounded-xl transition-all"
                               title="Delete"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={16} />
                             </button>
                           </div>
                         </div>

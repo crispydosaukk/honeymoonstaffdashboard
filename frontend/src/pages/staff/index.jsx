@@ -9,7 +9,7 @@ import { collection, query, onSnapshot, doc, getDoc, updateDoc, addDoc, deleteDo
 import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { Shield, Search, Plus, Briefcase, Mail, Phone, Eye, Printer, Edit2, Trash2, Users, UserCheck, X, Camera, Calendar, Loader2, Save, Clock, User } from "lucide-react";
+import { Shield, Search, Plus, Briefcase, Mail, Phone, Eye, Printer, Edit2, Trash2, Users, UserCheck, X, Camera, Calendar, Loader2, Save, Clock, User, PoundSterling, Store } from "lucide-react";
 
 const InputField = ({ icon: Icon, label, value, onChange, placeholder, type = "text", required = false, autoComplete = "off" }) => (
   <div className="space-y-2 group">
@@ -41,6 +41,7 @@ export default function StaffManagement() {
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({});
   const [filterStatus, setFilterStatus] = useState("all");
+  const [filterDesignation, setFilterDesignation] = useState("all");
 
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
@@ -57,8 +58,6 @@ export default function StaffManagement() {
     setLoading(true);
     const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-    // Filter by created_by so each manager only sees their own staff.
-    // Sorting done client-side to avoid needing a composite Firestore index.
     const q = user.uid
       ? query(collection(db, "staff"), where("created_by", "==", user.uid))
       : query(collection(db, "staff"));
@@ -70,8 +69,6 @@ export default function StaffManagement() {
       setStaff(staffList);
       setLoading(false);
 
-      // --- AUTO-REPAIR LOGIC ---
-      // Automatically link staff to this restaurant if the ID is missing
       const brokenStaff = staffList.filter(s => !s.restaurant_id);
       if (brokenStaff.length > 0) {
         brokenStaff.forEach(async (s) => {
@@ -102,6 +99,7 @@ export default function StaffManagement() {
         password: "",
         phone_number: item.phone_number || "",
         designation: item.designation || "",
+        hourly_rate: item.hourly_rate || "",
         gender: item.gender || "Male",
         dob: item.dob || "",
       });
@@ -114,6 +112,7 @@ export default function StaffManagement() {
         password: "",
         phone_number: "",
         designation: "",
+        hourly_rate: "",
         gender: "Male",
         dob: "",
       });
@@ -172,7 +171,6 @@ export default function StaffManagement() {
         updated_at: new Date()
       };
 
-      // Fetch restaurant name for denormalization (needed for app profile)
       const restaurantUid = user.uid || "";
       if (restaurantUid) {
         const restDoc = await getDoc(doc(db, "restaurants", restaurantUid));
@@ -192,25 +190,21 @@ export default function StaffManagement() {
       if (editingId) {
         await updateDoc(doc(db, "staff", editingId), updates);
       } else {
-        // Create Firebase Auth user for the staff
         try {
           const userCredential = await createUserWithEmailAndPassword(secondaryAuth, updates.email, updates.password);
           const newStaffUid = userCredential.user.uid;
           
-          // Sign out from secondary app immediately to prevent session conflicts
           await signOut(secondaryAuth);
 
           updates.created_at = new Date();
           updates.is_active = true;
           updates.created_by = user.uid || "";
           
-          // Generate Unique Employee ID if not present
           if (!updates.employee_id) {
             const randomNum = Math.floor(1000 + Math.random() * 9000);
             updates.employee_id = `WS-${randomNum}`;
           }
           
-          // Use Auth UID as Firestore Doc ID for consistency
           await setDoc(doc(db, "staff", newStaffUid), updates);
         } catch (authErr) {
           console.error("Auth Creation Error:", authErr);
@@ -220,8 +214,6 @@ export default function StaffManagement() {
           throw authErr;
         }
       }
-
-
 
       showPopup({
         title: "Success",
@@ -241,25 +233,6 @@ export default function StaffManagement() {
     }
   };
 
-
-
-  const handleDelete = (id) => {
-    showPopup({
-      title: "Remove account?",
-      message: "This action will permanently delete the staff member's access.",
-      type: "confirm",
-      onConfirm: async () => {
-        try {
-          await deleteDoc(doc(db, "staff", id));
-          showPopup({ title: "Removed", message: "Account deleted", type: "success" });
-        } catch (err) {
-          console.error(err);
-          showPopup({ title: "Error", message: "Failed to delete", type: "error" });
-        }
-      }
-    });
-  };
-
   const handleToggleStatus = async (id, currentStatus) => {
     try {
       await updateDoc(doc(db, "staff", id), { is_active: !currentStatus });
@@ -276,7 +249,6 @@ export default function StaffManagement() {
       setShowAttendanceModal(true);
 
       const params = filters || attendanceFilters;
-      // Index-free query
       let q = query(collection(db, "attendance"), where("staff_id", "==", id));
 
       const snapshot = await getDocs(q);
@@ -288,7 +260,6 @@ export default function StaffManagement() {
         date: doc.data().date?.toDate ? doc.data().date.toDate() : doc.data().date,
       }));
 
-      // Sort and Filter in JS
       records.sort((a, b) => {
         const dateA = a.clock_in instanceof Date ? a.clock_in : new Date(a.clock_in || 0);
         const dateB = b.clock_in instanceof Date ? b.clock_in : new Date(b.clock_in || 0);
@@ -324,16 +295,124 @@ export default function StaffManagement() {
     }
   };
 
+  const handleOpenReport = async (staffId) => {
+    try {
+      setLoading(true);
+      const staffMember = staff.find(s => s.id === staffId);
+      if (!staffMember) throw new Error("Staff member not found");
+
+      let q = query(collection(db, "attendance"), where("staff_id", "==", staffId));
+
+      const snapshot = await getDocs(q);
+      let records = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        clock_in: doc.data().clock_in?.toDate ? doc.data().clock_in.toDate() : doc.data().clock_in,
+        clock_out: doc.data().clock_out?.toDate ? doc.data().clock_out.toDate() : doc.data().clock_out,
+        date: doc.data().date?.toDate ? doc.data().date.toDate() : doc.data().date,
+      }));
+
+      if (attendanceFilters.from) {
+        const fromDate = new Date(attendanceFilters.from);
+        records = records.filter(r => new Date(r.clock_in) >= fromDate);
+      }
+      if (attendanceFilters.to) {
+        const toDate = new Date(attendanceFilters.to);
+        toDate.setHours(23, 59, 59, 999);
+        records = records.filter(r => new Date(r.clock_in) <= toDate);
+      }
+
+      records.sort((a, b) => {
+        const dateA = a.clock_in instanceof Date ? a.clock_in : new Date(a.clock_in || 0);
+        const dateB = b.clock_in instanceof Date ? b.clock_in : new Date(b.clock_in || 0);
+        return dateB - dateA;
+      });
+
+      setAttendanceData({ staff: staffMember, records: records });
+      setShowReportModal(true);
+    } catch (err) {
+      console.error(err);
+      showPopup({ 
+        title: "Error", 
+        message: `Failed to load report: ${err.message || "Unknown error"}`, 
+        type: "error" 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAllStaffReport = async () => {
+    try {
+      setLoading(true);
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      
+      // 1. Fetch all staff for this restaurant
+      const staffQuery = query(collection(db, "staff"), where("created_by", "==", user.uid));
+      const staffSnap = await getDocs(staffQuery);
+      const staffList = staffSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // 2. Fetch all attendance records
+      const attendanceQuery = query(collection(db, "attendance"), where("restaurant_id", "==", user.uid));
+      const attendanceSnap = await getDocs(attendanceQuery);
+      let allRecords = attendanceSnap.docs.map(d => ({
+        ...d.data(),
+        clock_in: d.data().clock_in?.toDate ? d.data().clock_in.toDate() : d.data().clock_in,
+        clock_out: d.data().clock_out?.toDate ? d.data().clock_out.toDate() : d.data().clock_out,
+      }));
+
+      // --- New: Filter by Designation ---
+      if (filterDesignation !== "all") {
+        const staffIdsWithDesignation = staffList
+          .filter(s => s.designation === filterDesignation)
+          .map(s => s.id);
+        allRecords = allRecords.filter(r => staffIdsWithDesignation.includes(r.staff_id));
+      }
+
+      // 3. Filter by date range
+      if (attendanceFilters.from) {
+        const fromDate = new Date(attendanceFilters.from);
+        allRecords = allRecords.filter(r => new Date(r.clock_in) >= fromDate);
+      }
+      if (attendanceFilters.to) {
+        const toDate = new Date(attendanceFilters.to);
+        toDate.setHours(23, 59, 59, 999);
+        allRecords = allRecords.filter(r => new Date(r.clock_in) <= toDate);
+      }
+
+      setAttendanceData({ 
+        staff: { id: "all", full_name: "All Staff Summary", restaurant_name: staffList[0]?.restaurant_name || "Restaurant" }, 
+        records: allRecords 
+      });
+      setShowReportModal(true);
+    } catch (err) {
+      console.error(err);
+      showPopup({ title: "Error", message: "Failed to generate all-staff report", type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const formatWorkTime = (minutes) => {
+    if (!minutes || isNaN(minutes)) return "0h 0m";
+    const absMin = Math.abs(minutes);
+    const h = Math.floor(absMin / 60);
+    const m = absMin % 60;
+    return `${minutes < 0 ? "-" : ""}${h}h ${m}m`;
+  };
+
   const groupedRecords = useMemo(() => {
     if (!attendanceData || !Array.isArray(attendanceData.records)) return [];
 
     const groups = {};
     attendanceData.records.forEach(record => {
       if (!record || !record.date) return;
-
-      // Group by local date string to ensure sessions from the same local day stay together
       const dateObj = record.date instanceof Date ? record.date : new Date(record.date);
-      const dateKey = dateObj.toLocaleDateString('en-CA'); // YYYY-MM-DD
+      const dateKey = dateObj.toLocaleDateString('en-CA');
 
       if (!groups[dateKey]) {
         groups[dateKey] = {
@@ -343,7 +422,6 @@ export default function StaffManagement() {
           sessions: []
         };
       }
-
       const g = groups[dateKey];
       g.total_minutes += (record.total_minutes || 0);
       g.sessions.push(record);
@@ -382,88 +460,30 @@ export default function StaffManagement() {
     }
   };
 
-  const handleOpenReport = async (staffId) => {
-    try {
-      setLoading(true);
-      const staffMember = staff.find(s => s.id === staffId);
-      if (!staffMember) throw new Error("Staff member not found");
+  const designations = useMemo(() => {
+    const set = new Set();
+    staff.forEach(s => { if (s.designation) set.add(s.designation); });
+    return Array.from(set).sort();
+  }, [staff]);
 
-      // Index-free query
-      let q = query(collection(db, "attendance"), where("staff_id", "==", staffId));
-
-      const snapshot = await getDocs(q);
-      let records = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        clock_in: doc.data().clock_in?.toDate ? doc.data().clock_in.toDate() : doc.data().clock_in,
-        clock_out: doc.data().clock_out?.toDate ? doc.data().clock_out.toDate() : doc.data().clock_out,
-        date: doc.data().date?.toDate ? doc.data().date.toDate() : doc.data().date,
-      }));
-
-      // Filter and Sort in JS
-      if (attendanceFilters.from) {
-        const fromDate = new Date(attendanceFilters.from);
-        records = records.filter(r => new Date(r.clock_in) >= fromDate);
-      }
-      if (attendanceFilters.to) {
-        const toDate = new Date(attendanceFilters.to);
-        toDate.setHours(23, 59, 59, 999);
-        records = records.filter(r => new Date(r.clock_in) <= toDate);
-      }
-
-      records.sort((a, b) => {
-        const dateA = a.clock_in instanceof Date ? a.clock_in : new Date(a.clock_in || 0);
-        const dateB = b.clock_in instanceof Date ? b.clock_in : new Date(b.clock_in || 0);
-        return dateB - dateA;
-      });
-
-
-      setAttendanceData({ staff: staffMember, records: records });
-      setShowReportModal(true);
-    } catch (err) {
-      console.error(err);
-      showPopup({ 
-        title: "Error", 
-        message: `Failed to load report: ${err.message || "Unknown error"}`, 
-        type: "error" 
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const formatWorkTime = (minutes) => {
-    if (!minutes || isNaN(minutes)) return "0h 0m";
-    const absMin = Math.abs(minutes);
-    const h = Math.floor(absMin / 60);
-    const m = absMin % 60;
-    return `${minutes < 0 ? "-" : ""}${h}h ${m}m`;
-  };
-
-  const filteredStaff = staff.filter(s => {
-    const matchSearch = s.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-      s.email?.toLowerCase().includes(search.toLowerCase()) ||
-      s.designation?.toLowerCase().includes(search.toLowerCase());
-    
-    const matchStatus = filterStatus === "all" || 
-      (filterStatus === "active" && s.is_active) || 
-      (filterStatus === "inactive" && !s.is_active);
-
-    return matchSearch && matchStatus;
-  });
-
+  const filteredStaff = useMemo(() => {
+    return staff.filter(s => {
+      const matchSearch = s.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+        s.email?.toLowerCase().includes(search.toLowerCase()) ||
+        s.designation?.toLowerCase().includes(search.toLowerCase());
+      const matchStatus = filterStatus === "all" || (filterStatus === "active" && s.is_active) || (filterStatus === "inactive" && !s.is_active);
+      const matchDesignation = filterDesignation === "all" || s.designation === filterDesignation;
+      return matchSearch && matchStatus && matchDesignation;
+    });
+  }, [staff, search, filterStatus, filterDesignation]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#071428] font-sans selection:bg-[#D0B079]/30 text-white overflow-x-hidden">
       <Header onToggleSidebar={() => setSidebarOpen(s => !s)} darkMode={true} />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className={`flex-1 flex flex-col transition-all duration-500 ease-in-out ${sidebarOpen ? "lg:pl-72" : "lg:pl-0"}`}>
-        <main className="flex-1 pt-28 pb-20 px-6 sm:px-10">
+      <div className={`flex-1 flex flex-col transition-all duration-500 ease-in-out ${sidebarOpen ? "lg:pl-[300px]" : "lg:pl-0"}`}>
+        <main className={`flex-1 pt-28 pb-20 px-6 sm:px-10 transition-all duration-500 ${sidebarOpen ? "lg:px-12" : "lg:px-20"}`}>
           <div className="max-w-6xl mx-auto">
 
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-12">
@@ -472,27 +492,66 @@ export default function StaffManagement() {
                 animate={{ opacity: 1, x: 0 }}
                 className="flex items-center gap-6"
               >
-                <h1 className="text-3xl font-semibold tracking-tight text-white flex items-center gap-4 whitespace-nowrap">
-                  Staff management
-                  <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] font-bold text-white/40 tracking-wider">
+                <h1 className="text-4xl font-semibold tracking-tight text-white flex items-center gap-4 whitespace-nowrap">
+                  Staff Management
+                  <span className="px-4 py-1 bg-white/5 border border-white/10 rounded-full text-sm font-bold text-white/40 tracking-wider">
                     {staff.length} Members
                   </span>
                 </h1>
               </motion.div>
 
               <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-                <div className="relative group w-full sm:w-64">
-                  <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-[#D0B079] transition-colors" />
+                <div className="flex items-center gap-2 bg-white/5 p-1 rounded-2xl border border-white/10">
                   <input
-                    type="text"
-                    placeholder="Search directory..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-white font-semibold placeholder-white/20 focus:outline-none focus:border-[#D0B079]/50 transition-all text-xs"
+                    type="date"
+                    value={attendanceFilters.from}
+                    onChange={(e) => setAttendanceFilters(p => ({ ...p, from: e.target.value }))}
+                    className="bg-transparent border-none text-[10px] font-bold text-white/50 focus:ring-0 uppercase px-3 py-2 cursor-pointer"
+                  />
+                  <div className="w-px h-4 bg-white/10" />
+                  <input
+                    type="date"
+                    value={attendanceFilters.to}
+                    onChange={(e) => setAttendanceFilters(p => ({ ...p, to: e.target.value }))}
+                    className="bg-transparent border-none text-[10px] font-bold text-white/50 focus:ring-0 uppercase px-3 py-2 cursor-pointer"
                   />
                 </div>
 
-                <select
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleAllStaffReport}
+                  className="w-full sm:w-auto px-6 py-3.5 bg-white/5 hover:bg-white/10 text-white font-bold rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-2 text-[15px]"
+                >
+                  <Printer size={18} />
+                  All Staff Report
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleOpenModal()}
+                  className="w-full sm:w-auto px-6 py-3.5 bg-[#D0B079] hover:bg-[#b8965f] text-slate-900 font-bold rounded-2xl shadow-xl shadow-[#D0B079]/10 transition-all flex items-center justify-center gap-2 text-[15px] whitespace-nowrap"
+                >
+                  <Plus size={18} />
+                  Register Staff
+                </motion.button>
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-4 mb-8">
+              <div className="relative flex-1 group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-[#D0B079] transition-colors" size={20} />
+                <input
+                  type="text"
+                  placeholder="Search staff members..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 bg-white/[0.03] border border-white/[0.08] rounded-2xl text-white placeholder-white/20 focus:outline-none focus:ring-4 focus:ring-[#D0B079]/10 focus:border-[#D0B079]/40 transition-all"
+                />
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <select 
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
                   className="w-full sm:w-auto px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-white/70 font-semibold focus:outline-none focus:border-[#D0B079]/50 transition-all text-xs cursor-pointer [&>option]:bg-[#071428]"
@@ -501,18 +560,16 @@ export default function StaffManagement() {
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
-
-
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleOpenModal()}
-                  className="w-full sm:w-auto px-6 py-3.5 bg-[#D0B079] hover:bg-[#b8965f] text-slate-900 font-bold rounded-2xl shadow-xl shadow-[#D0B079]/10 transition-all flex items-center justify-center gap-2 text-xs whitespace-nowrap"
+                <select 
+                  value={filterDesignation}
+                  onChange={(e) => setFilterDesignation(e.target.value)}
+                  className="w-full sm:w-auto px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-white/70 font-semibold focus:outline-none focus:border-[#D0B079]/50 transition-all text-xs cursor-pointer [&>option]:bg-[#071428]"
                 >
-                  <Plus size={16} />
-                  Register staff
-                </motion.button>
+                  <option value="all">All Roles</option>
+                  {designations.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -531,7 +588,7 @@ export default function StaffManagement() {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, scale: 0.9 }}
-                      className="group relative bg-white/[0.02] border border-white/[0.08] hover:border-[#D0B079]/30 hover:bg-white/[0.04] p-4 rounded-3xl transition-all duration-500 flex flex-col md:flex-row md:items-center justify-between gap-6"
+                      className="group relative bg-white/[0.02] border border-white/[0.08] hover:border-[#D0B079]/30 hover:bg-white/[0.04] p-5 rounded-[2rem] transition-all duration-500 flex flex-col xl:flex-row xl:items-center justify-between gap-6"
                     >
                       <div className="flex items-center gap-6 flex-1 min-w-0">
                         <div className="relative shrink-0">
@@ -539,86 +596,102 @@ export default function StaffManagement() {
                             <img
                               src={item.profile_image}
                               alt={item.full_name}
-                              className="w-16 h-16 rounded-2xl object-cover border border-white/10 group-hover:scale-105 transition-transform duration-500"
+                              className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl object-cover border border-white/10 group-hover:scale-105 transition-transform duration-500 shadow-xl"
                             />
                           ) : (
-                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#D0B079] to-[#b8965f] flex items-center justify-center font-bold text-slate-900 text-xl shadow-lg">
+                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-[#D0B079] to-[#b8965f] flex items-center justify-center font-black text-slate-900 text-2xl shadow-xl">
                               {item.full_name?.charAt(0).toUpperCase()}
                             </div>
                           )}
+                          <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-[#071428] ${item.is_active ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                         </div>
-
+ 
                         <div className="min-w-0 flex-1">
-                          <h3 className="text-xl font-semibold text-white truncate group-hover:text-[#D0B079] transition-colors">{item.full_name}</h3>
-                          <div className="flex items-center gap-3 mt-1">
-                            <div className="flex items-center gap-1.5 text-[#D0B079] font-bold text-[10px] tracking-wide bg-[#D0B079]/10 px-2 py-0.5 rounded-lg border border-[#D0B079]/20">
-                              <Briefcase size={10} />
-                              {item.designation || "Staff member"}
+                          <h3 className="text-xl font-bold text-white truncate group-hover:text-[#D0B079] transition-colors tracking-tight">{item.full_name}</h3>
+                          <div className="flex flex-wrap items-center gap-3 mt-2">
+                            <div className="flex items-center gap-1.5 text-[#D0B079] font-bold text-[11px] bg-[#D0B079]/5 px-3 py-1 rounded-md border border-[#D0B079]/10">
+                              <Briefcase size={11} />
+                              {item.designation || "Member"}
                             </div>
-                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border ${item.is_active !== 0 ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                            {item.hourly_rate && (
+                              <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[11px] bg-emerald-400/5 px-3 py-1 rounded-md border border-emerald-400/10">
+                                <PoundSterling size={11} />
+                                £{item.hourly_rate}/hr
+                              </div>
+                            )}
+                            <span className={`px-3 py-1 text-[11px] font-bold rounded-md border ${item.is_active !== 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
                               {item.is_active !== 0 ? 'Active' : 'Inactive'}
                             </span>
                             {item.employee_id && (
-                              <span className="px-2 py-0.5 text-[10px] font-bold rounded-lg border bg-white/5 text-[#D0B079] border-white/10">
+                              <span className="px-3 py-1 text-[11px] font-bold rounded-md border bg-white/5 text-white/30 border-white/10">
                                 {item.employee_id}
                               </span>
                             )}
-
                           </div>
                         </div>
-
-                        <div className="hidden lg:flex flex-col gap-1 flex-1 min-w-0 px-4 border-l border-white/5">
-                          <div className="flex items-center gap-2 text-white/40 text-xs">
-                            <Mail size={12} className="shrink-0" />
+ 
+                        <div className="hidden 2xl:flex flex-col gap-1.5 flex-1 min-w-0 px-6 border-l border-white/5">
+                          <div className="flex items-center gap-2 text-white/40 text-[11px] font-medium">
+                            <Mail size={12} className="shrink-0 text-[#D0B079]/40" />
                             <span className="truncate">{item.email}</span>
                           </div>
-                          <div className="flex items-center gap-2 text-white/40 text-xs">
-                            <Phone size={12} className="shrink-0" />
+                          <div className="flex items-center gap-2 text-white/40 text-[11px] font-medium">
+                            <Phone size={12} className="shrink-0 text-[#D0B079]/40" />
                             <span className="truncate">{item.phone_number || "—"}</span>
                           </div>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
+ 
+                      <div className="flex items-center justify-between xl:justify-end gap-4 pt-4 xl:pt-0 border-t xl:border-t-0 border-white/5">
                         <button
                           onClick={() => handleToggleStatus(item.id, item.is_active)}
-                          className={`relative inline-flex h-9 w-14 items-center rounded-xl transition-colors focus:outline-none ${item.is_active ? 'bg-green-500/20' : 'bg-white/5'} hover:bg-white/10`}
-                          title={item.is_active ? "Deactivate user" : "Activate user"}
+                          className={`relative inline-flex h-10 w-16 items-center rounded-2xl transition-all focus:outline-none ${item.is_active ? 'bg-emerald-500/20' : 'bg-white/5'} hover:scale-105 active:scale-95`}
+                          title={item.is_active ? "Deactivate" : "Activate"}
                         >
-                          <span className={`inline-block h-6 w-6 transform rounded-lg transition-transform ${item.is_active ? 'translate-x-7 bg-green-500' : 'translate-x-1 bg-white/30'}`} />
+                          <span className={`inline-block h-7 w-7 transform rounded-xl transition-transform duration-300 shadow-lg ${item.is_active ? 'translate-x-8 bg-emerald-500' : 'translate-x-1 bg-white/20'}`} />
                         </button>
-
-                        <div className="h-8 w-px bg-white/5 mx-2 hidden md:block" />
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleViewAttendance(item.id)}
-                            className="p-2.5 bg-white/5 hover:bg-blue-500/20 text-white/40 hover:text-blue-400 rounded-xl border border-white/5 transition-all"
-                            title="View attendance"
-                          >
-                            <Eye size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleOpenReport(item.id)}
-                            className="p-2.5 bg-white/5 hover:bg-emerald-500/20 text-white/40 hover:text-emerald-400 rounded-xl border border-white/5 transition-all"
-                            title="Generate report"
-                          >
-                            <Printer size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleOpenModal(item)}
-                            className="p-2.5 bg-white/5 hover:bg-[#D0B079]/20 text-white/40 hover:text-[#D0B079] rounded-xl border border-white/5 transition-all"
-                            title="Edit profile"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            className="p-2.5 bg-white/5 hover:bg-rose-500/20 text-white/40 hover:text-rose-400 rounded-xl border border-white/5 transition-all"
-                            title="Delete account"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+ 
+                        <div className="h-10 w-px bg-white/5 mx-1 hidden xl:block" />
+ 
+                        <div className="flex flex-wrap items-center gap-3">
+                          <div className="flex items-center gap-2 bg-white/5 p-1 rounded-xl border border-white/10 no-print">
+                            <input
+                              type="date"
+                              value={attendanceFilters.from}
+                              onChange={(e) => setAttendanceFilters(p => ({ ...p, from: e.target.value }))}
+                              className="bg-transparent border-none text-[10px] font-bold text-white/40 focus:ring-0 uppercase px-2 py-1 cursor-pointer"
+                            />
+                            <div className="w-px h-3 bg-white/10" />
+                            <input
+                              type="date"
+                              value={attendanceFilters.to}
+                              onChange={(e) => setAttendanceFilters(p => ({ ...p, to: e.target.value }))}
+                              className="bg-transparent border-none text-[10px] font-bold text-white/40 focus:ring-0 uppercase px-2 py-1 cursor-pointer"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleViewAttendance(item.id)}
+                              className="p-3 bg-white/5 hover:bg-blue-500/20 text-white/40 hover:text-blue-400 rounded-xl border border-white/10 transition-all active:scale-90"
+                              title="Attendance"
+                            >
+                              <Eye size={18} />
+                            </button>
+                            <button
+                              onClick={() => handleOpenReport(item.id)}
+                              className="p-3 bg-white/5 hover:bg-emerald-500/20 text-white/40 hover:text-emerald-400 rounded-xl border border-white/10 transition-all active:scale-90"
+                              title="Report"
+                            >
+                              <Printer size={18} />
+                            </button>
+                            <button
+                              onClick={() => handleOpenModal(item)}
+                              className="p-3 bg-white/5 hover:bg-[#D0B079]/20 text-white/40 hover:text-[#D0B079] rounded-xl border border-white/10 transition-all active:scale-90"
+                              title="Edit"
+                            >
+                              <Edit2 size={18} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </motion.div>
@@ -719,26 +792,40 @@ export default function StaffManagement() {
                   </div>
 
                   <div className="lg:col-span-8 space-y-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <InputField
-                        label="Full name"
-                        icon={User}
-                        value={formData.full_name}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const capitalized = val.length > 0 ? val.charAt(0).toUpperCase() + val.slice(1) : val;
-                          setFormData(p => ({ ...p, full_name: capitalized }));
-                        }}
-                        placeholder="e.g. Johnathan Doe"
-                        required
-                      />
-                      <InputField
-                        label="Designation"
-                        icon={Briefcase}
-                        value={formData.designation}
-                        onChange={(e) => setFormData(p => ({ ...p, designation: e.target.value }))}
-                        placeholder="e.g. Head Chef"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                      <div className="md:col-span-1">
+                        <InputField
+                          label="Full name"
+                          icon={User}
+                          value={formData.full_name}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const capitalized = val.length > 0 ? val.charAt(0).toUpperCase() + val.slice(1) : val;
+                            setFormData(p => ({ ...p, full_name: capitalized }));
+                          }}
+                          placeholder="e.g. Johnathan Doe"
+                          required
+                        />
+                      </div>
+                      <div className="md:col-span-1">
+                        <InputField
+                          label="Designation"
+                          icon={Briefcase}
+                          value={formData.designation}
+                          onChange={(e) => setFormData(p => ({ ...p, designation: e.target.value }))}
+                          placeholder="e.g. Head Chef"
+                        />
+                      </div>
+                      <div className="md:col-span-1">
+                        <InputField
+                          label="Hourly Rate (£)"
+                          icon={PoundSterling}
+                          value={formData.hourly_rate}
+                          onChange={(e) => setFormData(p => ({ ...p, hourly_rate: e.target.value }))}
+                          placeholder="e.g. 11.50"
+                          type="number"
+                        />
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1091,16 +1178,52 @@ export default function StaffManagement() {
                     </div>
                   </div>
 
-                  {/* Staff Info */}
-                  <div className="mb-10">
-                    <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Staff details</p>
-                    <h3 className="text-xl font-bold" style={{ color: '#1e293b' }}>{attendanceData?.staff?.full_name}</h3>
-                    <p className="text-sm font-semibold" style={{ color: '#64748b' }}>
-                      ID: {attendanceData?.staff?.employee_id || "N/A"} • {attendanceData?.staff?.designation || "Staff"}
-                    </p>
-                    <p className="text-sm font-bold mt-3" style={{ color: '#D0B079' }}>
-                      Period: {attendanceFilters.from || "Start"} — {attendanceFilters.to || "End"}
-                    </p>
+                  {/* Staff Info Card with Date Range in Modal */}
+                  <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 bg-slate-50 p-8 rounded-[2rem] border border-slate-200">
+                    <div className="flex-1">
+                      <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Staff details</p>
+                      <h3 className="text-2xl font-bold" style={{ color: '#1e293b' }}>{attendanceData?.staff?.full_name}</h3>
+                      <p className="text-sm font-semibold" style={{ color: '#64748b' }}>
+                        ID: {attendanceData?.staff?.employee_id || "N/A"} • {attendanceData?.staff?.designation || "Staff"}
+                      </p>
+                      
+                      <div className="mt-4 flex items-center gap-3 no-print">
+                        <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+                          <input
+                            type="date"
+                            value={attendanceFilters.from}
+                            onChange={(e) => setAttendanceFilters(p => ({ ...p, from: e.target.value }))}
+                            className="bg-transparent border-none text-[10px] font-bold text-slate-400 focus:ring-0 uppercase px-2 py-1 cursor-pointer"
+                          />
+                          <div className="w-px h-3 bg-slate-200" />
+                          <input
+                            type="date"
+                            value={attendanceFilters.to}
+                            onChange={(e) => setAttendanceFilters(p => ({ ...p, to: e.target.value }))}
+                            className="bg-transparent border-none text-[10px] font-bold text-slate-400 focus:ring-0 uppercase px-2 py-1 cursor-pointer"
+                          />
+                        </div>
+                        <button 
+                          onClick={() => {
+                            if (attendanceData?.staff?.id === "all") handleAllStaffReport();
+                            else handleOpenReport(attendanceData?.staff?.id);
+                          }}
+                          className="px-4 py-2 bg-slate-900 text-white text-[10px] font-black rounded-xl uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10"
+                        >
+                          Refresh Preview
+                        </button>
+                      </div>
+                      
+                      <p className="text-sm font-bold mt-4 text-[#D0B079]">
+                        Report Period: {attendanceFilters.from || "Start"} — {attendanceFilters.to || "End"}
+                      </p>
+                    </div>
+                    {attendanceData?.staff?.hourly_rate && (
+                      <div className="text-right p-6 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[150px]">
+                        <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Hourly Rate</p>
+                        <p className="text-2xl font-black text-slate-900">£{attendanceData.staff.hourly_rate}</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Table */}
@@ -1139,9 +1262,19 @@ export default function StaffManagement() {
                     </tbody>
                     <tfoot>
                       <tr className="border-t-2 border-slate-900 bg-slate-50/30" style={{ borderTopColor: '#0f172a', backgroundColor: '#f8fafc' }}>
-                        <td colSpan="3" className="px-4 py-6 text-right font-black uppercase tracking-widest text-xs" style={{ color: '#94a3b8' }}>Grand Total</td>
+                        <td colSpan="3" className="px-4 py-6 text-right font-black uppercase tracking-widest text-xs" style={{ color: '#94a3b8' }}>
+                          Grand Total ({Array.isArray(attendanceData?.records) ? (attendanceData.records.reduce((sum, r) => sum + (r.total_minutes || 0), 0) / 60).toFixed(2) : 0} hrs)
+                        </td>
                         <td className="px-4 py-6 text-right font-black text-2xl" style={{ color: '#0f172a' }}>
-                          {formatWorkTime(Array.isArray(attendanceData?.records) ? attendanceData.records.reduce((sum, r) => sum + (r.total_minutes || 0), 0) : 0)}
+                          {(() => {
+                            const totalMinutes = Array.isArray(attendanceData?.records) ? attendanceData.records.reduce((sum, r) => sum + (r.total_minutes || 0), 0) : 0;
+                            const rate = Number(attendanceData?.staff?.hourly_rate || 0);
+                            if (rate > 0) {
+                              const pay = (totalMinutes / 60) * rate;
+                              return `£${pay.toFixed(2)}`;
+                            }
+                            return formatWorkTime(totalMinutes);
+                          })()}
                         </td>
                       </tr>
                     </tfoot>

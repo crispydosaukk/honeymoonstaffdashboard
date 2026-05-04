@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Edit2, Save, Loader2, User, Camera, Briefcase, Shield, Calendar, Eye, Clock, XCircle,
-  Users, Search, X, Building2, Phone, Mail, ShieldCheck, ShieldOff, ChevronRight, Printer, FileText, Download, Bell
+  Users, Search, X, Building2, Phone, Mail, ShieldCheck, ShieldOff, ChevronRight, Printer, FileText, Download, Bell, Store, PoundSterling
 } from "lucide-react";
 import Header from "../../components/common/header.jsx";
 import Sidebar from "../../components/common/sidebar.jsx";
@@ -11,7 +11,9 @@ import { collection, query, onSnapshot, doc, updateDoc, where, getDocs, orderBy,
 import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { usePopup } from "../../context/PopupContext.jsx";
+import { sendPushNotification } from "../../utils/fcm";
 import Footer from "../../components/common/footer.jsx";
+
 
 function getInitials(name) {
   if (!name) return "?";
@@ -78,6 +80,7 @@ export default function AllStaffPage() {
   const [search, setSearch] = useState("");
   const [filterRestaurant, setFilterRestaurant] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [filterDesignation, setFilterDesignation] = useState("all");
   const [restaurantsMap, setRestaurantsMap] = useState({});
 
   // Edit modal state
@@ -89,7 +92,7 @@ export default function AllStaffPage() {
   const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     full_name: "", email: "", password: "", phone_number: "",
-    designation: "", gender: "Male", dob: "",
+    designation: "", hourly_rate: "", gender: "Male", dob: "",
   });
 
   // Attendance state
@@ -163,6 +166,7 @@ export default function AllStaffPage() {
       password: "",
       phone_number: item.phone_number || "",
       designation: item.designation || "",
+      hourly_rate: item.hourly_rate || "",
       gender: item.gender || "Male",
       dob: item.dob || "",
       restaurant_id: item.restaurant_id || ""
@@ -303,6 +307,61 @@ export default function AllStaffPage() {
     return `${minutes < 0 ? "-" : ""}${h}h ${m}m`;
   };
 
+  const handleAllStaffReport = async () => {
+    try {
+      setLoading(true);
+      
+      // 1. Fetch attendance records based on current restaurant filter
+      let q;
+      if (filterRestaurant !== "all") {
+        q = query(collection(db, "attendance"), where("restaurant_id", "==", filterRestaurant));
+      } else {
+        q = query(collection(db, "attendance"));
+      }
+      
+      const snapshot = await getDocs(q);
+      let allRecords = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        clock_in: doc.data().clock_in?.toDate ? doc.data().clock_in.toDate() : doc.data().clock_in,
+        clock_out: doc.data().clock_out?.toDate ? doc.data().clock_out.toDate() : doc.data().clock_out,
+      }));
+
+      // --- New: Filter by Designation ---
+      if (filterDesignation !== "all") {
+        const staffIdsWithDesignation = staff
+          .filter(s => s.designation === filterDesignation)
+          .map(s => s.id);
+        allRecords = allRecords.filter(r => staffIdsWithDesignation.includes(r.staff_id));
+      }
+
+      // 2. Filter by date range
+      if (attendanceFilters.from) {
+        const fromDate = new Date(attendanceFilters.from);
+        allRecords = allRecords.filter(r => new Date(r.clock_in) >= fromDate);
+      }
+      if (attendanceFilters.to) {
+        const toDate = new Date(attendanceFilters.to);
+        toDate.setHours(23, 59, 59, 999);
+        allRecords = allRecords.filter(r => new Date(r.clock_in) <= toDate);
+      }
+
+      setAttendanceData({ 
+        staff: { 
+          id: "all",
+          full_name: filterRestaurant !== "all" ? `${restaurantsMap[filterRestaurant]} Summary` : "All Restaurants Summary",
+          restaurant_name: "Watan Group Global" 
+        }, 
+        records: allRecords 
+      });
+      setShowReportModal(true);
+    } catch (err) {
+      console.error(err);
+      showPopup({ title: "Error", message: "Failed to generate summary report", type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleToggleStatus = async (id, currentStatus) => {
     try {
       await updateDoc(doc(db, "staff", id), { is_active: !currentStatus });
@@ -320,7 +379,7 @@ export default function AllStaffPage() {
     }
     setSendingNotification(true);
     try {
-      await addDoc(collection(db, "notifications"), {
+      const docRef = await addDoc(collection(db, "notifications"), {
         title: notificationData.title,
         body: notificationData.body,
         staff_id: notificationTarget.id,
@@ -331,6 +390,19 @@ export default function AllStaffPage() {
         fcm_token: notificationTarget.fcmToken || null,
         platform: notificationTarget.platform || "unknown"
       });
+
+      // Trigger Push Notification
+      if (notificationTarget.fcmToken) {
+        sendPushNotification({
+          fcm_token: notificationTarget.fcmToken,
+          title: notificationData.title,
+          body: notificationData.body,
+          priority: "normal",
+          type: "direct_message",
+          notificationId: docRef.id
+        });
+      }
+
       showPopup({ title: "Sent", message: "Notification sent successfully", type: "success" });
       setShowNotificationModal(false);
       setNotificationData({ title: "", body: "" });
@@ -421,6 +493,7 @@ export default function AllStaffPage() {
         email: formData.email,
         phone_number: formData.phone_number || "",
         designation: formData.designation || "",
+        hourly_rate: formData.hourly_rate || "",
         gender: formData.gender || "Male",
         dob: formData.dob || "",
         restaurant_id: formData.restaurant_id || "",
@@ -456,6 +529,12 @@ export default function AllStaffPage() {
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [staff, restaurantsMap]);
 
+  const designations = useMemo(() => {
+    const set = new Set();
+    staff.forEach(s => { if (s.designation) set.add(s.designation); });
+    return Array.from(set).sort();
+  }, [staff]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return staff.filter((s) => {
@@ -465,9 +544,10 @@ export default function AllStaffPage() {
         s.designation?.toLowerCase().includes(q) || s.employee_id?.toLowerCase().includes(q) || rName.toLowerCase().includes(q);
       const matchRestaurant = filterRestaurant === "all" || String(s.restaurant_id) === String(filterRestaurant) || String(s.created_by) === String(filterRestaurant);
       const matchStatus = filterStatus === "all" || (filterStatus === "active" && s.is_active) || (filterStatus === "inactive" && !s.is_active);
-      return matchSearch && matchRestaurant && matchStatus;
+      const matchDesignation = filterDesignation === "all" || s.designation === filterDesignation;
+      return matchSearch && matchRestaurant && matchStatus && matchDesignation;
     });
-  }, [staff, search, filterRestaurant, filterStatus, restaurantsMap]);
+  }, [staff, search, filterRestaurant, filterStatus, filterDesignation, restaurantsMap]);
 
   const grouped = useMemo(() => {
     const map = new Map();
@@ -484,25 +564,46 @@ export default function AllStaffPage() {
     <div className="min-h-screen flex flex-col bg-[#071428] font-sans text-white overflow-x-hidden">
       <Header onToggleSidebar={() => setSidebarOpen(s => !s)} darkMode={true} />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className={`flex-1 flex flex-col transition-all duration-500 ease-in-out ${sidebarOpen ? "lg:pl-72" : "lg:pl-0"}`}>
-        <main className="flex-1 pt-28 pb-20 px-6 sm:px-10">
+      <div className={`flex-1 flex flex-col transition-all duration-500 ease-in-out ${sidebarOpen ? "lg:pl-[300px]" : "lg:pl-0"}`}>
+        <main className={`flex-1 pt-28 pb-20 px-6 sm:px-10 transition-all duration-500 ${sidebarOpen ? "lg:px-12" : "lg:px-20"}`}>
           <div className="max-w-7xl mx-auto">
 
             {/* Page Header */}
             <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }}
               className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
               <div>
-                <div className="flex items-center gap-3 text-[#D0B079] font-bold text-xs mb-3">
-                  <Shield size={14} /><span>Super admin access</span>
+                <div className="flex items-center gap-3 text-[#D0B079] font-bold text-sm mb-3">
+                  <Shield size={16} /><span>Super Admin Access</span>
                 </div>
                 <h1 className="text-4xl font-semibold tracking-tight text-white flex items-center gap-4">
-                  All staff members
-                  <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-bold text-white/40 tracking-wider">{staff.length} Total</span>
+                  All Staff Members
+                  <span className="px-4 py-1 bg-white/5 border border-white/10 rounded-full text-sm font-bold text-white/40 tracking-wider">{staff.length} Total</span>
                 </h1>
                 <p className="text-white/40 text-base font-medium mt-2">All restaurants combined — view, edit and manage status</p>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="px-4 py-2 rounded-xl text-sm font-bold bg-white/5 text-white/50 border border-white/10">
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+                <div className="flex items-center gap-2 bg-white/5 p-1 rounded-2xl border border-white/10">
+                  <input
+                    type="date"
+                    value={attendanceFilters.from}
+                    onChange={(e) => setAttendanceFilters(p => ({ ...p, from: e.target.value }))}
+                    className="bg-transparent border-none text-[12px] font-bold text-white/50 focus:ring-0 px-3 py-1 cursor-pointer"
+                  />
+                  <div className="w-px h-4 bg-white/10" />
+                  <input
+                    type="date"
+                    value={attendanceFilters.to}
+                    onChange={(e) => setAttendanceFilters(p => ({ ...p, to: e.target.value }))}
+                    className="bg-transparent border-none text-[12px] font-bold text-white/50 focus:ring-0 px-3 py-1 cursor-pointer"
+                  />
+                </div>
+                <button
+                  onClick={handleAllStaffReport}
+                  className="px-6 py-3.5 rounded-xl text-[15px] font-bold bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 transition-all flex items-center gap-2"
+                >
+                  <Printer size={18} /> Summary Report
+                </button>
+                <span className="px-6 py-3.5 rounded-xl text-[15px] font-bold bg-white/5 text-[#D0B079] border border-[#D0B079]/20">
                   {restaurants.length} Restaurants
                 </span>
               </div>
@@ -532,6 +633,11 @@ export default function AllStaffPage() {
                 <option value="all">All status</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
+              </select>
+              <select value={filterDesignation} onChange={(e) => setFilterDesignation(e.target.value)}
+                className="px-4 py-3 rounded-2xl text-sm bg-white/5 border border-white/10 text-white/80 focus:outline-none focus:border-[#D0B079]/50 transition-all cursor-pointer [&>option]:bg-[#0b1a3d] [&>option]:text-white">
+                <option value="all">All roles</option>
+                {designations.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </motion.div>
 
@@ -563,93 +669,108 @@ export default function AllStaffPage() {
                     <div className="flex items-center gap-3 mb-5">
                       <div className="p-2 rounded-lg bg-white/5 border border-white/10"><Building2 size={16} className="text-[#D0B079]" /></div>
                       <div>
-                        <h2 className="text-white font-bold text-base">{restaurantName}</h2>
-                        <p className="text-white/30 text-xs font-medium">{members.length} member{members.length !== 1 ? "s" : ""}</p>
+                        <h2 className="text-white font-bold text-lg">{restaurantName}</h2>
+                        <p className="text-white/30 text-sm font-medium">{members.length} member{members.length !== 1 ? "s" : ""}</p>
                       </div>
                       <div className="flex-1 h-px bg-white/5 ml-2" />
                     </div>
 
                     {/* Staff Grid */}
-                    <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
                       {members.map((s, si) => (
                         <motion.div key={s.id}
                           initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: gi * 0.06 + si * 0.04 }}
-                          className="group relative rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 hover:bg-white/[0.04] hover:border-[#D0B079]/25 transition-all duration-500 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                          className="group relative rounded-3xl border border-white/[0.08] bg-white/[0.02] p-5 hover:bg-white/[0.04] hover:border-[#D0B079]/25 transition-all duration-500 flex flex-col sm:flex-row sm:items-center justify-between gap-6"
                         >
-                          <div className="flex items-center gap-4 flex-1 min-w-0">
-                            <div className="shrink-0">
+                          <div className="flex items-center gap-5 flex-1 min-w-0">
+                            <div className="relative shrink-0">
                               <Avatar src={s.profile_image} name={s.full_name} size="md" />
+                              <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[#071428] ${s.is_active ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                             </div>
                             
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="text-white font-semibold text-base truncate">{s.full_name}</p>
-                                <span className={`shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-semibold border ${
+                              <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                                <p className="text-white font-bold text-lg truncate tracking-tight">{s.full_name}</p>
+                                <span className={`shrink-0 flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold border ${
                                   s.is_active ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"
                                 }`}>
-                                  {s.is_active ? <ShieldCheck size={8} /> : <ShieldOff size={8} />}
                                   {s.is_active ? "Active" : "Inactive"}
                                 </span>
                               </div>
-                              <p className="text-[#D0B079] text-[10px] font-bold tracking-wide flex items-center gap-1.5">
-                                <Briefcase size={10} />{s.designation || "Staff member"}
-                              </p>
-                            </div>
-
-                            <div className="hidden xl:flex flex-col gap-1 flex-1 min-w-0 px-4 border-l border-white/5">
-                              <div className="flex items-center gap-2 text-white/40 text-[10px]">
-                                <Mail size={10} className="shrink-0" /><span className="truncate">{s.email || "—"}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-white/40 text-[10px]">
-                                <Phone size={10} className="shrink-0" /><span>{s.phone_number || "—"}</span>
+                              <div className="flex items-center gap-3">
+                                <p className="text-[#D0B079] text-[11px] font-bold flex items-center gap-1.5 bg-[#D0B079]/5 px-3 py-1 rounded-md">
+                                  <Briefcase size={11} />{s.designation || "Member"}
+                                </p>
+                                {s.hourly_rate && (
+                                  <p className="text-emerald-400 text-[11px] font-bold flex items-center gap-1.5 bg-emerald-400/5 px-3 py-1 rounded-md border border-emerald-400/10">
+                                    <PoundSterling size={11} />£{s.hourly_rate}/hr
+                                  </p>
+                                )}
+                                <span className="text-white/20 text-[11px] font-bold">{s.employee_id}</span>
                               </div>
                             </div>
                           </div>
-
-                          <div className="flex items-center gap-3 shrink-0">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleToggleStatus(s.id, s.is_active)}
-                                className={`relative inline-flex h-8 w-12 items-center rounded-xl transition-colors focus:outline-none ${s.is_active ? "bg-emerald-500/20" : "bg-white/5"} hover:bg-white/10`}
-                                title={s.is_active ? "Deactivate" : "Activate"}
-                              >
-                                <span className={`inline-block h-5 w-5 transform rounded-lg transition-transform ${s.is_active ? "translate-x-6 bg-emerald-500" : "translate-x-1 bg-white/30"}`} />
-                              </button>
-
-                              <div className="h-6 w-px bg-white/5 mx-1" />
-
-                              <button
-                                onClick={() => handleViewAttendance(s.id)}
-                                className="p-2 bg-white/5 hover:bg-blue-500/20 text-white/30 hover:text-blue-400 rounded-xl border border-white/5 transition-all"
-                                title="View attendance"
-                              >
-                                <Eye size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleOpenReport(s.id)}
-                                className="p-2 bg-white/5 hover:bg-emerald-500/20 text-white/30 hover:text-emerald-400 rounded-xl border border-white/5 transition-all"
-                                title="Generate report"
-                              >
-                                <Printer size={14} />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setNotificationTarget({ id: s.id, name: s.full_name, fcmToken: s.fcmToken, platform: s.platform });
-                                  setShowNotificationModal(true);
-                                }}
-                                className="p-2 bg-white/5 hover:bg-amber-500/20 text-white/30 hover:text-amber-400 rounded-xl border border-white/5 transition-all"
-                                title="Send notification"
-                              >
-                                <Bell size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleOpenModal(s)}
-                                className="p-2 bg-white/5 hover:bg-[#D0B079]/20 text-white/30 hover:text-[#D0B079] rounded-xl border border-white/5 transition-all"
-                                title="Edit profile"
-                              >
-                                <Edit2 size={14} />
-                              </button>
+ 
+                          <div className="flex flex-wrap items-center justify-between sm:justify-end gap-4 pt-4 sm:pt-0 border-t sm:border-t-0 border-white/5">
+                            <div className="flex xl:flex flex-col gap-1.5 min-w-0 mr-4">
+                              <div className="flex items-center gap-2 text-white/40 text-[11px] font-medium">
+                                <Mail size={12} className="shrink-0 text-[#D0B079]/40" /><span className="truncate max-w-[150px]">{s.email || "—"}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-white/40 text-[11px] font-medium">
+                                <Phone size={12} className="shrink-0 text-[#D0B079]/40" /><span>{s.phone_number || "—"}</span>
+                              </div>
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-3">
+                              <div className="flex items-center gap-2 bg-white/5 p-1 rounded-xl border border-white/10 no-print">
+                                <input
+                                  type="date"
+                                  value={attendanceFilters.from}
+                                  onChange={(e) => setAttendanceFilters(p => ({ ...p, from: e.target.value }))}
+                                  className="bg-transparent border-none text-[11px] font-bold text-white/40 focus:ring-0 px-2 py-1 cursor-pointer"
+                                />
+                                <div className="w-px h-3 bg-white/10" />
+                                <input
+                                  type="date"
+                                  value={attendanceFilters.to}
+                                  onChange={(e) => setAttendanceFilters(p => ({ ...p, to: e.target.value }))}
+                                  className="bg-transparent border-none text-[11px] font-bold text-white/40 focus:ring-0 px-2 py-1 cursor-pointer"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleViewAttendance(s.id, attendanceFilters)}
+                                  className="p-3 bg-white/5 hover:bg-blue-500/20 text-white/30 hover:text-blue-400 rounded-xl border border-white/5 transition-all"
+                                  title="View attendance"
+                                >
+                                  <Eye size={18} />
+                                </button>
+                                <button
+                                  onClick={() => handleOpenReport(s.id, attendanceFilters)}
+                                  className="p-3 bg-white/5 hover:bg-emerald-500/20 text-white/30 hover:text-emerald-400 rounded-xl border border-white/5 transition-all"
+                                  title="Generate report"
+                                >
+                                  <Printer size={18} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setNotificationTarget({ id: s.id, name: s.full_name, fcmToken: s.fcmToken, platform: s.platform });
+                                    setShowNotificationModal(true);
+                                  }}
+                                  className="p-3 bg-white/5 hover:bg-amber-500/20 text-white/30 hover:text-amber-400 rounded-xl border border-white/5 transition-all"
+                                  title="Send notification"
+                                >
+                                  <Bell size={18} />
+                                </button>
+                                <button
+                                  onClick={() => handleOpenModal(s)}
+                                  className="p-3 bg-white/5 hover:bg-[#D0B079]/20 text-white/30 hover:text-[#D0B079] rounded-xl border border-white/5 transition-all"
+                                  title="Edit profile"
+                                >
+                                  <Edit2 size={18} />
+                                </button>
+                              </div>
                             </div>
                             <span className="text-[#D0B079] text-[10px] font-bold bg-white/5 px-2 py-1 rounded-lg border border-white/5">{s.employee_id}</span>
                           </div>
@@ -967,6 +1088,8 @@ export default function AllStaffPage() {
                         placeholder="e.g. Johnathan Doe" required />
                       <InputField label="Designation" icon={Briefcase} value={formData.designation}
                         onChange={(e) => setFormData(p => ({ ...p, designation: e.target.value }))} placeholder="e.g. Head Chef" />
+                      <InputField label="Hourly Rate (£)" icon={PoundSterling} value={formData.hourly_rate}
+                        onChange={(e) => setFormData(p => ({ ...p, hourly_rate: e.target.value }))} placeholder="e.g. 11.50" type="number" />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <InputField label="Email" icon={Mail} value={formData.email} type="email"
@@ -1048,16 +1171,52 @@ export default function AllStaffPage() {
                     </div>
                   </div>
 
-                  {/* Staff Info */}
-                  <div className="mb-10">
-                    <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Staff details</p>
-                    <h3 className="text-xl font-bold" style={{ color: '#1e293b' }}>{attendanceData?.staff?.full_name}</h3>
-                    <p className="text-sm font-semibold" style={{ color: '#64748b' }}>
-                      ID: {attendanceData?.staff?.employee_id || "N/A"} • {attendanceData?.staff?.designation || "Staff"}
-                    </p>
-                    <p className="text-sm font-bold mt-3" style={{ color: '#D0B079' }}>
-                      Period: {attendanceFilters.from || "Start"} — {attendanceFilters.to || "End"}
-                    </p>
+                  {/* Staff Info Card with Date Range in Modal */}
+                  <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 bg-slate-50 p-8 rounded-[2rem] border border-slate-200">
+                    <div className="flex-1">
+                      <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Staff details</p>
+                      <h3 className="text-2xl font-bold" style={{ color: '#1e293b' }}>{attendanceData?.staff?.full_name}</h3>
+                      <p className="text-sm font-semibold" style={{ color: '#64748b' }}>
+                        ID: {attendanceData?.staff?.employee_id || "N/A"} • {attendanceData?.staff?.designation || "Staff"}
+                      </p>
+                      
+                      <div className="mt-4 flex items-center gap-3 no-print">
+                        <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+                          <input
+                            type="date"
+                            value={attendanceFilters.from}
+                            onChange={(e) => setAttendanceFilters(p => ({ ...p, from: e.target.value }))}
+                            className="bg-transparent border-none text-[10px] font-bold text-slate-400 focus:ring-0 uppercase px-2 py-1 cursor-pointer"
+                          />
+                          <div className="w-px h-3 bg-slate-200" />
+                          <input
+                            type="date"
+                            value={attendanceFilters.to}
+                            onChange={(e) => setAttendanceFilters(p => ({ ...p, to: e.target.value }))}
+                            className="bg-transparent border-none text-[10px] font-bold text-slate-400 focus:ring-0 uppercase px-2 py-1 cursor-pointer"
+                          />
+                        </div>
+                        <button 
+                          onClick={() => {
+                            if (attendanceData?.staff?.id === "all") handleAllStaffReport();
+                            else handleOpenReport(attendanceData?.staff?.id);
+                          }}
+                          className="px-4 py-2 bg-slate-900 text-white text-[10px] font-black rounded-xl uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10"
+                        >
+                          Refresh Preview
+                        </button>
+                      </div>
+                      
+                      <p className="text-sm font-bold mt-4 text-[#D0B079]">
+                        Report Period: {attendanceFilters.from || "Start"} — {attendanceFilters.to || "End"}
+                      </p>
+                    </div>
+                    {attendanceData?.staff?.hourly_rate && (
+                      <div className="text-right p-6 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[150px]">
+                        <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Hourly Rate</p>
+                        <p className="text-2xl font-black text-slate-900">£{attendanceData.staff.hourly_rate}</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Table */}
@@ -1096,9 +1255,19 @@ export default function AllStaffPage() {
                     </tbody>
                     <tfoot>
                       <tr className="border-t-2 border-slate-900 bg-slate-50/30" style={{ borderTopColor: '#0f172a', backgroundColor: '#f8fafc' }}>
-                        <td colSpan="3" className="px-4 py-6 text-right font-black uppercase tracking-widest text-xs" style={{ color: '#94a3b8' }}>Grand Total</td>
+                        <td colSpan="3" className="px-4 py-6 text-right font-black uppercase tracking-widest text-xs" style={{ color: '#94a3b8' }}>
+                          Grand Total ({Array.isArray(attendanceData?.records) ? (attendanceData.records.reduce((sum, r) => sum + (r.total_minutes || 0), 0) / 60).toFixed(2) : 0} hrs)
+                        </td>
                         <td className="px-4 py-6 text-right font-black text-2xl" style={{ color: '#0f172a' }}>
-                          {formatWorkTime(Array.isArray(attendanceData?.records) ? attendanceData.records.reduce((sum, r) => sum + (r.total_minutes || 0), 0) : 0)}
+                          {(() => {
+                            const totalMinutes = Array.isArray(attendanceData?.records) ? attendanceData.records.reduce((sum, r) => sum + (r.total_minutes || 0), 0) : 0;
+                            const rate = Number(attendanceData?.staff?.hourly_rate || 0);
+                            if (rate > 0) {
+                              const pay = (totalMinutes / 60) * rate;
+                              return `£${pay.toFixed(2)}`;
+                            }
+                            return formatWorkTime(totalMinutes);
+                          })()}
                         </td>
                       </tr>
                     </tfoot>
