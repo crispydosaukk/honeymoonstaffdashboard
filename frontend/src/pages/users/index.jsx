@@ -6,7 +6,7 @@ import { db, secondaryAuth } from "../../lib/firebase";
 import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, orderBy, setDoc } from "firebase/firestore";
 import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Plus, Edit, Trash2, X, Users as UsersIcon, ChevronDown, Check, User, Mail, Lock } from "lucide-react";
+import { Search, Plus, Edit, Trash2, X, Users as UsersIcon, ChevronDown, Check, User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { usePopup } from "../../context/PopupContext";
 
 // Helper: Custom Glass MultiSelect (reused concept)
@@ -110,6 +110,8 @@ export default function Users() {
   const [ePassword, setEPassword] = useState("");
   const [eRoleIds, setERoleIds] = useState([]);
   const [updating, setUpdating] = useState(false);
+  const [showCPassword, setShowCPassword] = useState(false);
+  const [showEPassword, setShowEPassword] = useState(false);
   const canUpdate = eId && eName.trim() && eEmail.trim() && eRoleIds.length > 0;
 
   // Load roles
@@ -205,7 +207,7 @@ export default function Users() {
     setEId(u.id);
     setEName(u.name || "");
     setEEmail(u.email || "");
-    setEPassword("");
+    setEPassword(u.password || "");
     setERoleIds(u.role_id ? [u.role_id] : []);
     setOpenEdit(true);
   };
@@ -458,14 +460,21 @@ export default function Users() {
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} />
                     <input
-                      type="password" 
+                      type={showCPassword ? "text" : "password"} 
                       name="new_user_password"
                       value={cPassword} 
                       onChange={(e) => setCPassword(e.target.value)}
                       autoComplete="new-password"
-                      className="w-full pl-10 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#D0B079]/50"
+                      className="w-full pl-10 pr-12 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#D0B079]/50"
                       placeholder="Set initial password"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowCPassword(!showCPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                    >
+                      {showCPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
                   </div>
                 </div>
                 <div>
@@ -549,14 +558,21 @@ export default function Users() {
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} />
                     <input
-                      type="password" 
+                      type={showEPassword ? "text" : "password"} 
                       name="edit_user_password"
                       value={ePassword} 
                       onChange={(e) => setEPassword(e.target.value)}
                       autoComplete="new-password"
-                      className="w-full pl-10 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#D0B079]/50"
+                      className="w-full pl-10 pr-12 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#D0B079]/50"
                       placeholder="Blank to keep current"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowEPassword(!showEPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                    >
+                      {showEPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
                   </div>
                 </div>
                 <div>

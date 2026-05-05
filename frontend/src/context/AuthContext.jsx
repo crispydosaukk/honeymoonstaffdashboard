@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { 
-  onAuthStateChanged, 
-  signInWithEmailAndPassword, 
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
   signOut,
   setPersistence,
   browserLocalPersistence
@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
-        
+
         try {
           let data = null;
           let perms = [];
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }) => {
             ...data
           }));
           localStorage.setItem('perms', JSON.stringify(perms));
-          
+
           setPerms(perms);
           setUserData(data);
 
@@ -72,14 +72,14 @@ export const AuthProvider = ({ children }) => {
           console.error("Firestore fetch error:", err);
           const fallbackData = { role_title: 'Super Admin', role_id: 6 };
           const fallbackPerms = ["dashboard", "staff_management", "all_staff", "restaurant", "access"];
-          
+
           localStorage.setItem('user', JSON.stringify({
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             ...fallbackData
           }));
           localStorage.setItem('perms', JSON.stringify(fallbackPerms));
-          
+
           setPerms(fallbackPerms);
           setUserData(fallbackData);
         }

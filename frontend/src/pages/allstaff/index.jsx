@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Edit2, Save, Loader2, User, Camera, Briefcase, Shield, Calendar, Eye, Clock, XCircle,
+  Edit2, Save, Loader2, User, Camera, Briefcase, Shield, Calendar, Eye, EyeOff, Clock, XCircle,
   Users, Search, X, Building2, Phone, Mail, ShieldCheck, ShieldOff, ChevronRight, Printer, FileText, Download, Bell, Store, PoundSterling
 } from "lucide-react";
 import Header from "../../components/common/header.jsx";
@@ -54,22 +54,38 @@ function Avatar({ src, name, size = "md" }) {
   );
 }
 
-const InputField = ({ icon: Icon, label, value, onChange, placeholder, type = "text", required = false, autoComplete = "off" }) => (
-  <div className="space-y-2 group">
-    <label className="text-sm font-medium tracking-wide text-white/70 group-focus-within:text-[#D0B079] transition-colors flex items-center gap-2">
-      {Icon && <Icon size={14} className="text-[#D0B079]" />}
-      {label} {required && <span className="text-rose-500">*</span>}
-    </label>
-    <input
-      type={type}
-      value={value || ""}
-      onChange={onChange}
-      placeholder={placeholder}
-      autoComplete={autoComplete}
-      className="w-full px-5 py-4 bg-white/[0.03] border border-white/[0.08] rounded-2xl text-white font-medium placeholder-white/20 focus:outline-none focus:ring-4 focus:ring-[#D0B079]/20 focus:border-[#D0B079]/40 transition-all text-base"
-    />
-  </div>
-);
+const InputField = ({ icon: Icon, label, value, onChange, placeholder, type = "text", required = false, autoComplete = "off" }) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === "password";
+
+  return (
+    <div className="space-y-2 group">
+      <label className="text-sm font-medium tracking-wide text-white/70 group-focus-within:text-[#D0B079] transition-colors flex items-center gap-2">
+        {Icon && <Icon size={14} className="text-[#D0B079]" />}
+        {label} {required && <span className="text-rose-500">*</span>}
+      </label>
+      <div className="relative">
+        <input
+          type={isPassword ? (showPassword ? "text" : "password") : type}
+          value={value || ""}
+          onChange={onChange}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          className="w-full px-5 py-4 bg-white/[0.03] border border-white/[0.08] rounded-2xl text-white font-medium placeholder-white/20 focus:outline-none focus:ring-4 focus:ring-[#D0B079]/20 focus:border-[#D0B079]/40 transition-all text-base"
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+          >
+            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export default function AllStaffPage() {
   const { showPopup } = usePopup();
@@ -163,7 +179,7 @@ export default function AllStaffPage() {
     setFormData({
       full_name: item.full_name || "",
       email: item.email || "",
-      password: "",
+      password: item.password || "",
       phone_number: item.phone_number || "",
       designation: item.designation || "",
       hourly_rate: item.hourly_rate || "",
