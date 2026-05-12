@@ -22,16 +22,19 @@ export function can(required, passedUser, passedPerms) {
   if (!required) return true;
 
   const user = passedUser || getUser();
-  const roleTitle = (user.role_title || user.role || "").toLowerCase();
-
+  const perms = (passedPerms || getPerms() || []).map(p => String(p).toLowerCase());
+  
   // 🔥 SUPER ADMIN BYPASS
-  if (String(user.role_id) === "6" || roleTitle.includes("super") || roleTitle.includes("admin") || String(user.role_id) === "1") {
-    return true;
-  }
+  const isSuper = (
+    user?.role_id === 6 || 
+    user?.role_id === "6" ||
+    (user?.role_title && String(user.role_title).toLowerCase().trim() === "super admin") ||
+    (user?.role && typeof user.role === 'string' && user.role.toLowerCase().trim() === "super admin") ||
+    (user?.role?.title && String(user.role.title).toLowerCase().trim() === "super admin")
+  );
 
-  // normal permissions for other roles
-  const perms = (passedPerms || getPerms()).map(p => String(p).toLowerCase());
-  return perms.includes(String(required).toLowerCase());
+  const hasPerm = perms.includes(String(required).toLowerCase());
+  return isSuper || hasPerm;
 }
 
 
@@ -42,14 +45,21 @@ export function can(required, passedUser, passedPerms) {
  */
 export function getSafePath(passedUser, passedPerms) {
   const user = passedUser || getUser();
-  const roleTitle = (user.role_title || user.role || "").toLowerCase();
+  
+  // 🔥 SUPER ADMIN BYPASS
+  const isSuper = (
+    user?.role_id === 6 || 
+    user?.role_id === "6" ||
+    user?.role_title?.toLowerCase()?.trim() === "super admin" ||
+    user?.role?.toLowerCase()?.trim() === "super admin" ||
+    user?.role?.title?.toLowerCase()?.trim() === "super admin"
+  );
 
-  // Super Admin bypass
-  if (String(user.role_id) === "6" || roleTitle.includes("super") || roleTitle.includes("admin") || String(user.role_id) === "1") {
+  if (isSuper) {
     return "/dashboard";
   }
 
-  const perms = (passedPerms || getPerms()).map(p => String(p).toLowerCase());
+  const perms = (passedPerms || getPerms() || []).map(p => String(p).toLowerCase());
 
   const map = [
     { perm: "dashboard", path: "/dashboard" },

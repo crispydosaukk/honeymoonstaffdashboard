@@ -11,6 +11,7 @@ import { collection, query, onSnapshot, doc, updateDoc, where, getDocs, orderBy,
 import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { usePopup } from "../../context/PopupContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 import { sendPushNotification } from "../../utils/fcm";
 import Footer from "../../components/common/footer.jsx";
 
@@ -89,6 +90,16 @@ const InputField = ({ icon: Icon, label, value, onChange, placeholder, type = "t
 
 export default function AllStaffPage() {
   const { showPopup } = usePopup();
+  const { userData } = useAuth();
+  
+  // 🔥 ROBUST SUPER ADMIN CHECK
+  const isSuper = useMemo(() => {
+    if (!userData) return false;
+    const roleId = String(userData.role_id || "");
+    const roleTitle = String(userData.role_title || userData.role || "").toLowerCase().trim();
+    return roleId === "6" || roleTitle === "super admin";
+  }, [userData]);
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -98,6 +109,7 @@ export default function AllStaffPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterDesignation, setFilterDesignation] = useState("all");
   const [restaurantsMap, setRestaurantsMap] = useState({});
+  const [restaurantsList, setRestaurantsList] = useState([]);
 
   // Edit modal state
   const [showModal, setShowModal] = useState(false);
@@ -106,6 +118,7 @@ export default function AllStaffPage() {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
+  const hasInitialized = useRef(false);
   const [formData, setFormData] = useState({
     full_name: "", email: "", password: "", phone_number: "",
     designation: "", hourly_rate: "", gender: "Male", dob: "",
@@ -131,13 +144,18 @@ export default function AllStaffPage() {
 
     const unsubRestaurants = onSnapshot(collection(db, "restaurants"), (snapshot) => {
       const rMap = {};
+      const rList = [];
       snapshot.forEach(doc => {
-        rMap[doc.id] = doc.data().restaurant_name || "Unknown Restaurant";
+        const data = doc.data();
+        rMap[doc.id] = data.restaurant_name || "Unknown Restaurant";
+        rList.push({ id: doc.id, name: data.restaurant_name || "Unknown Restaurant" });
       });
       setRestaurantsMap(rMap);
+      setRestaurantsList(rList);
     }, (err) => {
       console.error("Failed to load restaurants:", err);
     });
+    // Initialization logic moved to separate useEffect below
 
     const q = query(collection(db, "staff"), orderBy("full_name", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -172,7 +190,24 @@ export default function AllStaffPage() {
       unsubscribe();
       unsubRestaurants();
     };
-  }, []);
+  }, [filterRestaurant, filterStatus, filterDesignation]); // Re-subscribe when filters change if needed, but usually onSnapshot handles it globally
+
+  // 🛡️ ROLE-BASED INITIALIZATION WATCHDOG
+  useEffect(() => {
+    if (userData && !hasInitialized.current) {
+      const roleId = String(userData.role_id || "");
+      const roleTitle = String(userData.role_title || userData.role || "").toLowerCase().trim();
+      const userIsSuper = roleId === "6" || roleTitle === "super admin";
+      
+      if (!userIsSuper && userData?.restaurant_id) {
+        setFilterRestaurant(String(userData.restaurant_id));
+        hasInitialized.current = true;
+      } else if (userIsSuper) {
+        setFilterRestaurant("all");
+        hasInitialized.current = true;
+      }
+    }
+  }, [userData]);
 
   const handleOpenModal = (item) => {
     setEditingId(item.id);
@@ -535,15 +570,8 @@ export default function AllStaffPage() {
 
 
   const restaurants = useMemo(() => {
-    const map = new Map();
-    staff.forEach((s) => { 
-      const rId = s.restaurant_id || s.created_by;
-      if (rId) {
-        map.set(rId, restaurantsMap[rId] || s.restaurant_name || `Restaurant #${rId}`);
-      }
-    });
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [staff, restaurantsMap]);
+    return restaurantsList;
+  }, [restaurantsList]);
 
   const designations = useMemo(() => {
     const set = new Set();
@@ -640,8 +668,9 @@ export default function AllStaffPage() {
                 )}
               </div>
               <select value={filterRestaurant} onChange={(e) => setFilterRestaurant(e.target.value)}
-                className="px-4 py-3 rounded-2xl text-sm bg-white/5 border border-white/10 text-white/80 focus:outline-none focus:border-[#D0B079]/50 transition-all cursor-pointer [&>option]:bg-[#0b1a3d] [&>option]:text-white">
-                <option value="all">All restaurants</option>
+                disabled={!isSuper}
+                className="px-4 py-3 rounded-2xl text-sm bg-white/5 border border-white/10 text-white/80 focus:outline-none focus:border-[#D0B079]/50 transition-all cursor-pointer [&>option]:bg-[#0b1a3d] [&>option]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
+                {isSuper && <option value="all">All restaurants</option>}
                 {restaurants.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
               <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}

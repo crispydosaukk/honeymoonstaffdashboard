@@ -87,8 +87,8 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const roleTitle = (userData?.role_title || userData?.role || "").toLowerCase();
-  const isSuper = String(userData?.role_id) === "6" || String(userData?.role_id) === "1" || roleTitle.includes("super") || roleTitle.includes("admin");
+  const roleTitle = (userData?.role_title || userData?.role || "").toLowerCase().trim();
+  const isSuper = roleTitle === "super admin";
 
   const [stats, setStats] = useState({
     total_staff: 0,
@@ -162,13 +162,16 @@ export default function Dashboard() {
 
 
   const calculateStaffStats = async (staffList) => {
-
-    const userStr = localStorage.getItem("user");
-    const user = userStr ? JSON.parse(userStr) : {};
-    const restaurantId = selectedRestaurant || String(user.restaurant_id || "");
+    // 1. Determine the effective Restaurant ID
+    const restaurantId = selectedRestaurant || String(userData?.restaurant_id || "");
     
-    let filteredStaff = staffList;
-    if (restaurantId) {
+    let filteredStaff = [];
+
+    if (isSuper && !selectedRestaurant) {
+      // Super Admin viewing all
+      filteredStaff = staffList;
+    } else if (restaurantId) {
+      // Filtered view (either Super Admin selecting one, or regular Admin restricted to one)
       const selectedRest = restaurants.find(r => String(r.id) === String(restaurantId));
       const restName = selectedRest?.restaurant_name;
 
@@ -182,6 +185,9 @@ export default function Dashboard() {
                (restName && sRestId === String(restName)) ||
                (restName && sRestName === String(restName));
       });
+    } else {
+      // Restricted user with NO restaurant_id assigned - SHOW NOTHING
+      filteredStaff = [];
     }
 
 

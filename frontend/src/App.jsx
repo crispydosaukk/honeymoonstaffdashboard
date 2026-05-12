@@ -86,7 +86,7 @@ export default function App() {
           path="/notifications"
           element={
             <PrivateRoute>
-              <RequirePerm perm="all_staff"><NotificationsPage /></RequirePerm>
+              <RequirePerm perm="notifications"><NotificationsPage /></RequirePerm>
             </PrivateRoute>
           }
         />

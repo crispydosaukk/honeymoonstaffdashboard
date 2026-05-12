@@ -6,18 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import { X } from "lucide-react";
 
 
-function isSuperAdmin() {
-  try {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const roleTitle = (user.role_title || user.role || "").toLowerCase();
-    return (
-      user.role_id === 6 ||
-      roleTitle.includes("super")
-    );
-  } catch {
-    return false;
-  }
-}
+
 
 /* Sidebar link item */
 const Item = ({ to = "#", icon, label }) => (
@@ -78,6 +67,7 @@ function Group({ label, icon, children, defaultOpen = false, hidden = false, ope
 }
 
 export default function Sidebar({ open, onClose }) {
+  const { userData, perms } = useAuth();
   const { showPopup } = usePopup();
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -130,27 +120,18 @@ export default function Sidebar({ open, onClose }) {
 
   const visibleMenu = useMemo(() => {
     const q = debouncedQuery;
-    return rawMenu.filter((m) => can(m.perm) && (!q || m.label.toLowerCase().includes(q)));
-  }, [rawMenu, debouncedQuery]);
+    return rawMenu.filter((m) => can(m.perm, userData, perms) && (!q || m.label.toLowerCase().includes(q)));
+  }, [rawMenu, debouncedQuery, userData, perms]);
 
   const filteredAccessChildren = useMemo(() => {
     const q = debouncedQuery;
     return rawAccessChildren.filter(
-      (c) => can(c.perm) && (!q || c.label.toLowerCase().includes(q))
+      (c) => can(c.perm, userData, perms) && (!q || c.label.toLowerCase().includes(q))
     );
-  }, [rawAccessChildren, debouncedQuery]);
+  }, [rawAccessChildren, debouncedQuery, userData, perms]);
 
   const showAccessGroup =
     filteredAccessChildren.length > 0 || location.pathname.startsWith("/access");
-
-  const [user] = useState(() => {
-    try {
-      const u = localStorage.getItem("user");
-      return u ? JSON.parse(u) : null;
-    } catch {
-      return null;
-    }
-  });
 
   return (
     <>
@@ -231,11 +212,11 @@ export default function Sidebar({ open, onClose }) {
           <div className="flex items-center gap-3 px-1 mb-3">
             <div className="h-9 w-9 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 border border-white/15"
               style={{ background: 'linear-gradient(135deg, #f97316, #fb923c)' }}>
-              {user?.name ? user.name.charAt(0).toUpperCase() : "A"}
+              {userData?.name ? userData.name.charAt(0).toUpperCase() : "A"}
             </div>
             <div className="min-w-0">
-              <div className="text-[13px] font-semibold text-white/90 truncate">{user?.name || "Admin"}</div>
-              <div className="text-[11px] text-white/40 truncate">{user?.email || "admin@watanstaff.com"}</div>
+              <div className="text-[13px] font-semibold text-white/90 truncate">{userData?.name || "Admin"}</div>
+              <div className="text-[11px] text-white/40 truncate">{userData?.email || "admin@watanstaff.com"}</div>
             </div>
           </div>
 

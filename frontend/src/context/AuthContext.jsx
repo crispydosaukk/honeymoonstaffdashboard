@@ -6,7 +6,7 @@ import {
   setPersistence,
   browserLocalPersistence
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, query, collection, where, limit, getDocs, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 const AuthContext = createContext();
@@ -42,6 +42,22 @@ export const AuthProvider = ({ children }) => {
             data = staffDoc.data();
           }
 
+          // 🚀 AUTOMATIC DATABASE REPAIR
+          if (data && !data.restaurant_id && data.role_title !== "Super Admin" && firebaseUser.uid) {
+            try {
+              const staffQ = query(collection(db, "staff"), where("created_by", "==", firebaseUser.uid), limit(1));
+              const staffSnap = await getDocs(staffQ);
+              if (!staffSnap.empty) {
+                const foundId = staffSnap.docs[0].data().restaurant_id;
+                if (foundId) {
+                  await updateDoc(doc(db, "users", firebaseUser.uid), { restaurant_id: foundId });
+                  data.restaurant_id = foundId;
+                  console.log(`[REPAIR] Auto-assigned restaurant: ${foundId}`);
+                }
+              }
+            } catch (e) { console.error("Repair failed:", e); }
+          }
+
           // Handle data and fetch roles if needed
           if (data) {
             if (data.role_id) {
@@ -52,9 +68,9 @@ export const AuthProvider = ({ children }) => {
               }
             }
           } else {
-            // Fallback for Super Admins not yet in Firestore
-            data = { role_title: 'Super Admin', role_id: 6 };
-            perms = ["dashboard", "staff_management", "all_staff", "restaurant", "access"];
+            // User not found in Firestore - NO ACCESS
+            data = { role_title: 'Unassigned', role_id: 0 };
+            perms = [];
           }
 
           // 5. Finalize state and localStorage
@@ -70,18 +86,10 @@ export const AuthProvider = ({ children }) => {
 
         } catch (err) {
           console.error("Firestore fetch error:", err);
-          const fallbackData = { role_title: 'Super Admin', role_id: 6 };
-          const fallbackPerms = ["dashboard", "staff_management", "all_staff", "restaurant", "access"];
-
-          localStorage.setItem('user', JSON.stringify({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            ...fallbackData
-          }));
-          localStorage.setItem('perms', JSON.stringify(fallbackPerms));
-
-          setPerms(fallbackPerms);
-          setUserData(fallbackData);
+          setUserData(null);
+          setPerms([]);
+          localStorage.removeItem('user');
+          localStorage.removeItem('perms');
         }
       } else {
         setUser(null);
