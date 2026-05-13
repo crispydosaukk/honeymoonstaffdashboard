@@ -216,7 +216,7 @@ export default function StaffManagement() {
           
           if (!updates.employee_id) {
             const randomNum = Math.floor(1000 + Math.random() * 9000);
-            updates.employee_id = `WS-${randomNum}`;
+            updates.employee_id = `HMS-${randomNum}`;
           }
           
           await setDoc(doc(db, "staff", newStaffUid), updates);
@@ -848,7 +848,7 @@ export default function StaffManagement() {
                         icon={Mail}
                         value={formData.email}
                         onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
-                        placeholder="staff@watanstaff.com"
+                        placeholder="staff@honeymoonstaff.com"
                         type="email"
                         required
                       />
@@ -1187,7 +1187,7 @@ export default function StaffManagement() {
                       <p className="text-sm font-bold mt-1" style={{ color: '#64748b' }}>Generated: {new Date().toLocaleDateString()}</p>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-black" style={{ color: '#1e293b' }}>Watan Group</div>
+                      <div className="text-2xl font-black" style={{ color: '#1e293b' }}>HoneyMoon Group</div>
                       <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#94a3b8' }}>{attendanceData?.staff?.restaurant_name || "Restaurant Staff"}</p>
                     </div>
                   </div>
@@ -1296,7 +1296,7 @@ export default function StaffManagement() {
 
                   {/* Footer */}
                   <div className="mt-12 pt-8 border-t border-slate-100 text-center italic text-[10px]" style={{ borderTopColor: '#f1f5f9', color: '#94a3b8' }}>
-                    <p>© Watan Staff Management System • Report Generated on {new Date().toLocaleString()}</p>
+                    <p>© HoneyMoon Staff Management System • Report Generated on {new Date().toLocaleString()}</p>
                   </div>
                 </div>
               </div>

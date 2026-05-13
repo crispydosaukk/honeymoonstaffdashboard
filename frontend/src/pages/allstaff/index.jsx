@@ -400,7 +400,7 @@ export default function AllStaffPage() {
         staff: { 
           id: "all",
           full_name: filterRestaurant !== "all" ? `${restaurantsMap[filterRestaurant]} Summary` : "All Restaurants Summary",
-          restaurant_name: "Watan Group Global" 
+          restaurant_name: "HoneyMoon Group Global" 
         }, 
         records: allRecords 
       });
@@ -1138,7 +1138,7 @@ export default function AllStaffPage() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <InputField label="Email" icon={Mail} value={formData.email} type="email"
-                        onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))} placeholder="staff@watanstaff.com" required />
+                        onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))} placeholder="staff@honeymoonstaff.com" required />
                       <InputField label="Phone Number" icon={Phone} value={formData.phone_number}
                         onChange={(e) => setFormData(p => ({ ...p, phone_number: e.target.value }))} placeholder="+44 7700 900000" />
                     </div>
@@ -1211,7 +1211,7 @@ export default function AllStaffPage() {
                       <p className="text-sm font-bold mt-1" style={{ color: '#64748b' }}>Generated: {new Date().toLocaleDateString()}</p>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-black" style={{ color: '#1e293b' }}>Watan Group</div>
+                      <div className="text-2xl font-black" style={{ color: '#1e293b' }}>HoneyMoon Group</div>
                       <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#94a3b8' }}>{attendanceData?.staff?.restaurant_name || "Restaurant Staff"}</p>
                     </div>
                   </div>
@@ -1320,7 +1320,7 @@ export default function AllStaffPage() {
 
                   {/* Footer */}
                   <div className="mt-12 pt-8 border-t border-slate-100 text-center italic text-[10px]" style={{ borderTopColor: '#f1f5f9', color: '#94a3b8' }}>
-                    <p>© Watan Staff Management System • Report Generated on {new Date().toLocaleString()}</p>
+                    <p>© HoneyMoon Staff Management System • Report Generated on {new Date().toLocaleString()}</p>
                   </div>
                 </div>
               </div>
