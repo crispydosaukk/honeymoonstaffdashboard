@@ -4,7 +4,7 @@ import Sidebar from "../../components/common/sidebar.jsx";
 import Footer from "../../components/common/footer.jsx";
 import { db, secondaryAuth } from "../../lib/firebase";
 import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, orderBy, setDoc } from "firebase/firestore";
-import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { createUserWithEmailAndPassword, signOut, signInWithEmailAndPassword, updateEmail, updatePassword } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Plus, Edit, Trash2, X, Users as UsersIcon, ChevronDown, Check, User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { usePopup } from "../../context/PopupContext";
@@ -108,6 +108,8 @@ export default function Users() {
   const [eName, setEName] = useState("");
   const [eEmail, setEEmail] = useState("");
   const [ePassword, setEPassword] = useState("");
+  const [oldEmail, setOldEmail] = useState("");
+  const [oldPassword, setOldPassword] = useState("");
   const [eRoleIds, setERoleIds] = useState([]);
   const [updating, setUpdating] = useState(false);
   const [showCPassword, setShowCPassword] = useState(false);
@@ -208,6 +210,8 @@ export default function Users() {
     setEName(u.name || "");
     setEEmail(u.email || "");
     setEPassword(u.password || "");
+    setOldEmail(u.email || "");
+    setOldPassword(u.password || "");
     setERoleIds(u.role_id ? [u.role_id] : []);
     setOpenEdit(true);
   };
@@ -218,12 +222,37 @@ export default function Users() {
     try {
       setUpdating(true);
       const role_id = eRoleIds[0] || null;
+
+      // 1. Check if Email or Password changed - if so, sync with Firebase Auth
+      const emailChanged = eEmail.trim() !== oldEmail.trim();
+      const passwordChanged = ePassword.trim() !== oldPassword.trim() && ePassword.trim() !== "";
+
+      if (emailChanged || passwordChanged) {
+        try {
+          // Sign in as the user on the secondary app to update credentials
+          const userCred = await signInWithEmailAndPassword(secondaryAuth, oldEmail, oldPassword);
+          
+          if (emailChanged) {
+            await updateEmail(userCred.user, eEmail.trim());
+          }
+          if (passwordChanged) {
+            await updatePassword(userCred.user, ePassword.trim());
+          }
+          
+          await signOut(secondaryAuth);
+        } catch (authErr) {
+          console.error("Auth Sync Error:", authErr);
+          throw new Error(`Failed to update Login Account: ${authErr.message}. The profile was not updated.`);
+        }
+      }
+
+      // 2. Update Firestore Profile
       const data = { name: eName, email: eEmail, role_id, updated_at: new Date() };
       if (ePassword.trim()) data.password = ePassword.trim();
       
       await updateDoc(doc(db, "users", eId), data);
       setOpenEdit(false);
-      showPopup({ title: "Success", message: "User updated successfully.", type: "success" });
+      showPopup({ title: "Success", message: "User and Login Account updated successfully.", type: "success" });
     } catch (e) {
       showPopup({ title: "Error", message: e.message || "Failed to update user", type: "error" });
     } finally {
