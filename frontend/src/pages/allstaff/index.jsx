@@ -72,6 +72,8 @@ const InputField = ({ icon: Icon, label, value, onChange, placeholder, type = "t
           onChange={onChange}
           placeholder={placeholder}
           autoComplete={autoComplete}
+          readOnly
+          onFocus={(e) => e.target.removeAttribute('readonly')}
           className="w-full px-5 py-4 bg-white/[0.03] border border-white/[0.08] rounded-2xl text-white font-medium placeholder-white/20 focus:outline-none focus:ring-4 focus:ring-[#D0B079]/20 focus:border-[#D0B079]/40 transition-all text-base"
         />
         {isPassword && (

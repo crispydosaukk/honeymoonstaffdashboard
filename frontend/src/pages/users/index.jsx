@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Header from "../../components/common/header.jsx";
 import Sidebar from "../../components/common/sidebar.jsx";
 import Footer from "../../components/common/footer.jsx";
-import { db, secondaryAuth } from "../../lib/firebase";
+import { db, secondaryAuth, functionsInstance } from "../../lib/firebase";
 import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, orderBy, setDoc } from "firebase/firestore";
-import { createUserWithEmailAndPassword, signOut, signInWithEmailAndPassword, updateEmail, updatePassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Plus, Edit, Trash2, X, Users as UsersIcon, ChevronDown, Check, User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { usePopup } from "../../context/PopupContext";
@@ -223,36 +224,51 @@ export default function Users() {
       setUpdating(true);
       const role_id = eRoleIds[0] || null;
 
+      let finalEmail = eEmail.trim();
+      let finalPassword = ePassword.trim();
+      let authSyncFailed = false;
+      let authSyncMessage = "";
+
       // 1. Check if Email or Password changed - if so, sync with Firebase Auth
-      const emailChanged = eEmail.trim() !== oldEmail.trim();
-      const passwordChanged = ePassword.trim() !== oldPassword.trim() && ePassword.trim() !== "";
+      const emailChanged = finalEmail !== oldEmail.trim();
+      const passwordChanged = finalPassword !== oldPassword.trim() && finalPassword !== "";
 
       if (emailChanged || passwordChanged) {
         try {
-          // Sign in as the user on the secondary app to update credentials
-          const userCred = await signInWithEmailAndPassword(secondaryAuth, oldEmail, oldPassword);
+          const updateFn = httpsCallable(functionsInstance, 'updateUserCredentials');
           
-          if (emailChanged) {
-            await updateEmail(userCred.user, eEmail.trim());
-          }
-          if (passwordChanged) {
-            await updatePassword(userCred.user, ePassword.trim());
-          }
+          const payload = { uid: eId };
+          if (emailChanged) payload.email = finalEmail;
+          if (passwordChanged) payload.password = finalPassword;
+
+          await updateFn(payload);
           
-          await signOut(secondaryAuth);
         } catch (authErr) {
           console.error("Auth Sync Error:", authErr);
-          throw new Error(`Failed to update Login Account: ${authErr.message}. The profile was not updated.`);
+          authSyncFailed = true;
+          authSyncMessage = authErr.message;
+          // Revert so Firestore stays in sync with actual Auth state
+          finalEmail = oldEmail.trim();
+          finalPassword = oldPassword.trim();
         }
       }
 
       // 2. Update Firestore Profile
-      const data = { name: eName, email: eEmail, role_id, updated_at: new Date() };
-      if (ePassword.trim()) data.password = ePassword.trim();
+      const data = { name: eName, email: finalEmail, role_id, updated_at: new Date() };
+      if (finalPassword) data.password = finalPassword;
       
       await updateDoc(doc(db, "users", eId), data);
       setOpenEdit(false);
-      showPopup({ title: "Success", message: "User and Login Account updated successfully.", type: "success" });
+
+      if (authSyncFailed) {
+        showPopup({ 
+          title: "Update Failed", 
+          message: `Could not update credentials: ${authSyncMessage}. If it says 'user-not-found', this user was deleted from Auth and must be recreated.`, 
+          type: "warning" 
+        });
+      } else {
+        showPopup({ title: "Success", message: "User profile updated successfully.", type: "success" });
+      }
     } catch (e) {
       showPopup({ title: "Error", message: e.message || "Failed to update user", type: "error" });
     } finally {
@@ -455,8 +471,10 @@ export default function Users() {
 
               <div className="flex-1 overflow-y-auto custom-scrollbar space-y-5 pr-2">
                 {/* Dummy fields to capture aggressive browser autofill */}
-                <input type="text" name="email" style={{ display: 'none' }} />
-                <input type="password" name="password" style={{ display: 'none' }} />
+                <div style={{ position: 'absolute', opacity: 0, top: '-9999px', height: '1px', width: '1px', overflow: 'hidden' }} aria-hidden="true">
+                  <input type="email" name="fake_email" tabIndex="-1" autoComplete="username" defaultValue="" />
+                  <input type="password" name="fake_password" tabIndex="-1" autoComplete="current-password" defaultValue="" />
+                </div>
 
                 <div>
                   <label className="text-sm font-medium text-white/80 mb-2 block">Full Name</label>
@@ -479,6 +497,8 @@ export default function Users() {
                       value={cEmail} 
                       onChange={(e) => setCEmail(e.target.value)}
                       autoComplete="off"
+                      readOnly
+                      onFocus={(e) => e.target.removeAttribute('readonly')}
                       className="w-full pl-10 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#D0B079]/50"
                       placeholder="name@example.com"
                     />
@@ -494,6 +514,8 @@ export default function Users() {
                       value={cPassword} 
                       onChange={(e) => setCPassword(e.target.value)}
                       autoComplete="new-password"
+                      readOnly
+                      onFocus={(e) => e.target.removeAttribute('readonly')}
                       className="w-full pl-10 pr-12 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#D0B079]/50"
                       placeholder="Set initial password"
                     />
@@ -553,8 +575,10 @@ export default function Users() {
 
               <div className="flex-1 overflow-y-auto custom-scrollbar space-y-5 pr-2">
                 {/* Dummy fields to capture aggressive browser autofill */}
-                <input type="text" name="email" style={{ display: 'none' }} />
-                <input type="password" name="password" style={{ display: 'none' }} />
+                <div style={{ position: 'absolute', opacity: 0, top: '-9999px', height: '1px', width: '1px', overflow: 'hidden' }} aria-hidden="true">
+                  <input type="email" name="fake_edit_email" tabIndex="-1" autoComplete="username" defaultValue="" />
+                  <input type="password" name="fake_edit_password" tabIndex="-1" autoComplete="current-password" defaultValue="" />
+                </div>
 
                 <div>
                   <label className="text-sm font-medium text-white/80 mb-2 block">Full Name</label>
@@ -577,6 +601,8 @@ export default function Users() {
                       value={eEmail} 
                       onChange={(e) => setEEmail(e.target.value)}
                       autoComplete="off"
+                      readOnly
+                      onFocus={(e) => e.target.removeAttribute('readonly')}
                       className="w-full pl-10 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#D0B079]/50"
                       placeholder="name@example.com"
                     />
@@ -592,6 +618,8 @@ export default function Users() {
                       value={ePassword} 
                       onChange={(e) => setEPassword(e.target.value)}
                       autoComplete="new-password"
+                      readOnly
+                      onFocus={(e) => e.target.removeAttribute('readonly')}
                       className="w-full pl-10 pr-12 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#D0B079]/50"
                       placeholder="Blank to keep current"
                     />
