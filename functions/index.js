@@ -3,7 +3,6 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 exports.updateUserCredentials = functions.https.onCall(async (data, context) => {
-  // 1. Verify that the request came from an authenticated user
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -22,13 +21,38 @@ exports.updateUserCredentials = functions.https.onCall(async (data, context) => 
     if (email) updatePayload.email = email;
     if (password) updatePayload.password = password;
 
-    // Use the Firebase Admin SDK to forcefully update the user without needing the old password
-    const userRecord = await admin.auth().updateUser(uid, updatePayload);
+    await admin.auth().updateUser(uid, updatePayload);
 
     return { success: true, message: "Successfully updated user credentials." };
   } catch (error) {
     console.error("Error updating user:", error);
-    // Pass the actual Firebase error message to the frontend
+    throw new functions.https.HttpsError("invalid-argument", error.message);
+  }
+});
+
+exports.deleteAuthUser = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Only authenticated users can call this function."
+    );
+  }
+
+  const { uid } = data;
+
+  if (!uid) {
+    throw new functions.https.HttpsError("invalid-argument", "The 'uid' must be provided.");
+  }
+
+  try {
+    await admin.auth().deleteUser(uid);
+    return { success: true, message: "Successfully deleted user from Auth." };
+  } catch (error) {
+    console.error("Error deleting user from Auth:", error);
+    // If user not found in Auth, that's fine - just return success
+    if (error.code === 'auth/user-not-found') {
+      return { success: true, message: "User was already removed from Auth." };
+    }
     throw new functions.https.HttpsError("invalid-argument", error.message);
   }
 });

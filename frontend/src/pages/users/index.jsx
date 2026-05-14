@@ -237,8 +237,7 @@ export default function Users() {
         try {
           const updateFn = httpsCallable(functionsInstance, 'updateUserCredentials');
           
-          const payload = { uid: eId };
-          if (emailChanged) payload.email = finalEmail;
+          const payload = { uid: eId, email: finalEmail };
           if (passwordChanged) payload.password = finalPassword;
 
           await updateFn(payload);
@@ -284,8 +283,16 @@ export default function Users() {
       type: "confirm",
       onConfirm: async () => {
         try {
+          // Delete from Firebase Auth first (so email can be reused)
+          try {
+            const deleteAuthFn = httpsCallable(functionsInstance, 'deleteAuthUser');
+            await deleteAuthFn({ uid: u.id });
+          } catch (authErr) {
+            console.warn("Auth deletion skipped:", authErr.message);
+          }
+          // Then delete from Firestore
           await deleteDoc(doc(db, "users", u.id));
-          showPopup({ title: "Deleted", message: "User has been removed.", type: "success" });
+          showPopup({ title: "Deleted", message: "User has been fully removed.", type: "success" });
         } catch (e) {
           showPopup({ title: "Error", message: e.message || "Failed to delete user", type: "error" });
         }
