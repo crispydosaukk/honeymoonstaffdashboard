@@ -19,6 +19,9 @@ import RequirePerm from "./components/RequirePerm.jsx";
 import AllStaffPage from "./pages/allstaff/index.jsx";
 import StaffManagement from "./pages/staff/index.jsx";
 import NotificationsPage from "./pages/notifications/index.jsx";
+import PrivacyPolicy from "./pages/privacy-policy/index.jsx";
+import TermsAndConditions from "./pages/terms-and-conditions/index.jsx";
+import ContactAndSupport from "./pages/contact-and-support/index.jsx";
 import { getSafePath } from "./utils/perm";
 import { useAuth } from "./context/AuthContext";
 
@@ -45,6 +48,10 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+        <Route path="/contact-and-support" element={<ContactAndSupport />} />
 
         <Route
           path="/dashboard"
