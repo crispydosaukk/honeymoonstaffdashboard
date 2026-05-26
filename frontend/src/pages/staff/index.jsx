@@ -424,18 +424,42 @@ export default function StaffManagement() {
 
     const groups = {};
     attendanceData.records.forEach(record => {
-      if (!record || !record.date) return;
-      const dateObj = record.date instanceof Date ? record.date : new Date(record.date);
+      if (!record || (!record.date && !record.clock_in)) return;
+
+      let dateObj;
+      if (record.date) {
+         dateObj = record.date instanceof Date ? record.date : new Date(record.date?.toDate ? record.date.toDate() : record.date);
+      } else {
+         dateObj = record.clock_in instanceof Date ? record.clock_in : new Date(record.clock_in?.toDate ? record.clock_in.toDate() : record.clock_in);
+      }
+
+      if (isNaN(dateObj.getTime())) return;
       const dateKey = dateObj.toLocaleDateString('en-CA');
 
       if (!groups[dateKey]) {
         groups[dateKey] = {
           date: dateObj,
           dateKey: dateKey,
+          first_in: record.clock_in,
+          last_out: record.clock_out,
           total_minutes: 0,
           sessions: []
         };
+      } else {
+        const g = groups[dateKey];
+        const currentIn = record.clock_in instanceof Date ? record.clock_in : new Date(record.clock_in || 0);
+        const currentOut = record.clock_out instanceof Date ? record.clock_out : new Date(record.clock_out || 0);
+        const groupFirstIn = g.first_in instanceof Date ? g.first_in : new Date(g.first_in || 0);
+        const groupLastOut = g.last_out instanceof Date ? g.last_out : new Date(g.last_out || 0);
+        
+        if (record.clock_in && (!g.first_in || currentIn < groupFirstIn)) {
+          g.first_in = record.clock_in;
+        }
+        if (record.clock_out && (!g.last_out || currentOut > groupLastOut)) {
+          g.last_out = record.clock_out;
+        }
       }
+
       const g = groups[dateKey];
       g.total_minutes += (record.total_minutes || 0);
       g.sessions.push(record);
@@ -457,11 +481,21 @@ export default function StaffManagement() {
   const handleUpdateAttendanceRecord = async (e) => {
     e.preventDefault();
     if (!editingAttendance) return;
+    if (!editingAttendance.edit_reason || editingAttendance.edit_reason.trim() === "") {
+      showPopup({ title: "Required", message: "Please provide a reason for editing the timings", type: "warning" });
+      return;
+    }
     setUpdatingAttendance(true);
     try {
+      const cin = new Date(editingAttendance.clock_in);
+      const cout = new Date(editingAttendance.clock_out);
+      const totalMinutes = Math.floor((cout - cin) / 60000);
+
       await updateDoc(doc(db, "attendance", editingAttendance.id), {
-        clock_in: new Date(editingAttendance.clock_in),
-        clock_out: new Date(editingAttendance.clock_out)
+        clock_in: cin,
+        clock_out: cout,
+        total_minutes: Math.max(0, totalMinutes),
+        edit_reason: editingAttendance.edit_reason.trim()
       });
       showPopup({ title: "Success", message: "Attendance updated", type: "success" });
       setEditingAttendance(null);
@@ -1064,20 +1098,37 @@ export default function StaffManagement() {
                                 </td>
                                 <td className="px-8 py-5">
                                   {editingAttendance?.id === session.id ? (
-                                    <div className="space-y-1">
+                                    <div className="space-y-2">
                                       <input
                                         type="datetime-local"
                                         value={editingAttendance.clock_out}
                                         onChange={(e) => setEditingAttendance(p => ({ ...p, clock_out: e.target.value }))}
                                         className="w-full bg-white/5 border border-[#D0B079]/30 rounded-xl px-3 py-2 text-xs text-[#D0B079] focus:outline-none focus:border-[#D0B079] transition-all"
                                       />
+                                      <input 
+                                        type="text" 
+                                        placeholder="Reason for edit..."
+                                        value={editingAttendance.edit_reason || ""}
+                                        onChange={(e) => setEditingAttendance(p => ({ ...p, edit_reason: e.target.value }))}
+                                        className="w-full bg-white/5 border border-rose-500/30 rounded-xl px-3 py-2 text-xs text-rose-400 focus:outline-none focus:border-rose-500 transition-all placeholder:text-rose-500/30"
+                                      />
                                     </div>
                                   ) : (
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-2 h-2 rounded-full bg-rose-500 shadow-lg shadow-rose-500/20" />
-                                      <span className="text-white font-mono text-base font-medium">
-                                        {session.clock_out ? new Date(session.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
-                                      </span>
+                                    <div className="flex flex-col gap-1">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-2 h-2 rounded-full bg-rose-500 shadow-lg shadow-rose-500/20" />
+                                        <span className="text-white font-mono text-base font-medium">
+                                          {session.clock_out ? new Date(session.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
+                                        </span>
+                                      </div>
+                                      {session.edit_reason && (
+                                         <div className="flex items-center gap-3">
+                                           <div className="w-2 h-2 opacity-0" />
+                                           <span className="text-[10px] font-medium text-rose-400/80 italic">
+                                             Edited: {session.edit_reason}
+                                           </span>
+                                         </div>
+                                      )}
                                     </div>
                                   )}
                                 </td>
@@ -1116,7 +1167,8 @@ export default function StaffManagement() {
                                             setEditingAttendance({
                                               id: session.id,
                                               clock_in: toLocalISO(session.clock_in),
-                                              clock_out: toLocalISO(session.clock_out)
+                                              clock_out: toLocalISO(session.clock_out),
+                                              edit_reason: session.edit_reason || ""
                                             });
                                           }}
                                           className="p-2.5 bg-white/5 text-white/20 rounded-xl hover:bg-[#D0B079]/20 hover:text-[#D0B079] hover:border-[#D0B079]/30 border border-transparent transition-all opacity-0 group-hover:opacity-100"
