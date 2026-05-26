@@ -92,15 +92,15 @@ const InputField = ({ icon: Icon, label, value, onChange, placeholder, type = "t
 
 export default function AllStaffPage() {
   const { showPopup } = usePopup();
-  const { userData } = useAuth();
+  const { userData, perms } = useAuth();
   
   // 🔥 ROBUST SUPER ADMIN CHECK
   const isSuper = useMemo(() => {
     if (!userData) return false;
     const roleId = String(userData.role_id || "");
     const roleTitle = String(userData.role_title || userData.role || "").toLowerCase().trim();
-    return roleId === "6" || roleTitle === "super admin";
-  }, [userData]);
+    return roleId === "6" || roleTitle === "super admin" || perms?.includes("all_staff");
+  }, [userData, perms]);
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [staff, setStaff] = useState([]);
@@ -199,7 +199,7 @@ export default function AllStaffPage() {
     if (userData && !hasInitialized.current) {
       const roleId = String(userData.role_id || "");
       const roleTitle = String(userData.role_title || userData.role || "").toLowerCase().trim();
-      const userIsSuper = roleId === "6" || roleTitle === "super admin";
+      const userIsSuper = roleId === "6" || roleTitle === "super admin" || perms?.includes("all_staff");
       
       if (!userIsSuper && userData?.restaurant_id) {
         setFilterRestaurant(String(userData.restaurant_id));
@@ -209,7 +209,7 @@ export default function AllStaffPage() {
         hasInitialized.current = true;
       }
     }
-  }, [userData]);
+  }, [userData, perms]);
 
   const handleOpenModal = (item) => {
     setEditingId(item.id);

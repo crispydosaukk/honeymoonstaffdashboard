@@ -83,13 +83,13 @@ const StatCard = ({ title, value, subtext, icon: Icon, colorClass, delay, onEyeC
 // --- Main Dashboard ---
 
 export default function Dashboard() {
-  const { userData } = useAuth();
+  const { userData, perms } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const roleTitle = String(userData?.role_title || userData?.role || "").toLowerCase().trim();
   const roleId = String(userData?.role_id || "");
-  const isSuper = roleId === "6" || roleTitle === "super admin" || roleTitle === "superadmin";
+  const isSuper = roleId === "6" || roleTitle === "super admin" || roleTitle === "superadmin" || perms?.includes("all_staff");
 
   const [stats, setStats] = useState({
     total_staff: 0,
@@ -168,7 +168,7 @@ export default function Dashboard() {
       calculateStaffStats(staffList);
     });
     return () => unsubStaff();
-  }, [selectedRestaurant, selectedUser, dateRange, timeRange, isSuper, userData, restaurants]);
+  }, [selectedRestaurant, selectedUser, dateRange, timeRange, isSuper, userData, restaurants, perms]);
 
 
 
@@ -179,7 +179,7 @@ export default function Dashboard() {
     // Check super admin status directly from current userData
     const currentRoleTitle = String(userData?.role_title || userData?.role || "").toLowerCase().trim();
     const currentRoleId = String(userData?.role_id || "");
-    const currentIsSuper = currentRoleId === "6" || currentRoleTitle === "super admin" || currentRoleTitle === "superadmin";
+    const currentIsSuper = currentRoleId === "6" || currentRoleTitle === "super admin" || currentRoleTitle === "superadmin" || perms?.includes("all_staff");
     
     let filteredStaff = [];
 
