@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
+import { getCalculatedTime, calcCalculatedMinutes } from "../../utils/timeRounding";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Edit2, Save, Loader2, User, Camera, Briefcase, Shield, Calendar, Eye, EyeOff, Clock, XCircle,
@@ -287,6 +288,13 @@ export default function AllStaffPage() {
     }
   };
 
+  // Recalculate minutes from actual timestamps using calculated (rounded) times
+  const calcSessionMinutes = (record) => {
+    if (record.clock_in && record.clock_out) {
+      return calcCalculatedMinutes(record.clock_in, record.clock_out);
+    }
+    return 0;
+  };
 
   const groupedRecords = useMemo(() => {
     if (!attendanceData || !Array.isArray(attendanceData.records)) return [];
@@ -389,17 +397,6 @@ export default function AllStaffPage() {
       }
     }
     return timeStr;
-  };
-
-  // Recalculate minutes from actual timestamps — do NOT trust stored total_minutes
-  const calcSessionMinutes = (record) => {
-    if (record.clock_in && record.clock_out) {
-      const cin = record.clock_in instanceof Date ? record.clock_in : new Date(record.clock_in);
-      const cout = record.clock_out instanceof Date ? record.clock_out : new Date(record.clock_out);
-      const diff = Math.floor((cout.getTime() - cin.getTime()) / 60000);
-      return Math.max(0, Math.min(diff, 1440)); // cap at 24h per session
-    }
-    return 0;
   };
 
   const handleAllStaffReport = async () => {
@@ -629,7 +626,7 @@ export default function AllStaffPage() {
       const rId = s.restaurant_id || s.created_by;
       const rName = (rId ? restaurantsMap[rId] : null) || s.restaurant_name || "";
       const matchSearch = !q || s.full_name?.toLowerCase().includes(q) || s.email?.toLowerCase().includes(q) ||
-        s.designation?.toLowerCase().includes(q) || s.employee_id?.toLowerCase().includes(q) || rName.toLowerCase().includes(q);
+        s.designation?.toLowerCase().includes(q) || s.employee_id?.toLowerCase().includes(q);
       const matchRestaurant = filterRestaurant === "all" || String(s.restaurant_id) === String(filterRestaurant) || String(s.created_by) === String(filterRestaurant);
       const matchStatus = filterStatus === "all" || (filterStatus === "active" && s.is_active) || (filterStatus === "inactive" && !s.is_active);
       const matchDesignation = filterDesignation === "all" || s.designation === filterDesignation;
@@ -959,15 +956,16 @@ export default function AllStaffPage() {
                     <thead>
                       <tr className="bg-white/5">
                         <th className="px-8 py-5 text-[10px] font-black tracking-widest text-white/30 uppercase">Timeline</th>
-                        <th className="px-8 py-5 text-[10px] font-black tracking-widest text-white/30 uppercase">Check-In Event</th>
-                        <th className="px-8 py-5 text-[10px] font-black tracking-widest text-white/30 uppercase">Check-Out Event</th>
+                        <th className="px-8 py-5 text-[10px] font-black tracking-widest text-white/30 uppercase">Actual Clock-In</th>
+                        <th className="px-8 py-5 text-[10px] font-black tracking-widest text-[#D0B079]/50 uppercase">Calc. Clock-In</th>
+                        <th className="px-8 py-5 text-[10px] font-black tracking-widest text-white/30 uppercase">Clock-Out</th>
                         <th className="px-8 py-5 text-[10px] font-black tracking-widest text-white/30 uppercase text-right">Duration</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {loadingAttendance ? (
                         <tr>
-                          <td colSpan="4" className="px-6 py-32 text-center">
+                          <td colSpan="5" className="px-6 py-32 text-center">
                             <Loader2 className="animate-spin inline-block text-[#D0B079] mb-4" size={48} />
                             <p className="text-white/20 font-black tracking-[0.2em] text-xs uppercase">Synchronizing Logs...</p>
                           </td>
@@ -977,7 +975,7 @@ export default function AllStaffPage() {
                           <React.Fragment key={group.dateKey}>
                             {/* Day Header Row */}
                             <tr className="bg-[#D0B079]/5 border-y border-[#D0B079]/10">
-                              <td colSpan="3" className="px-8 py-4">
+                              <td colSpan="4" className="px-8 py-4">
                                 <div className="flex items-center gap-3">
                                   <Calendar size={14} className="text-[#D0B079]" />
                                   <span className="text-sm font-black text-white tracking-wide">
@@ -1018,6 +1016,18 @@ export default function AllStaffPage() {
                                       <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/20" />
                                       <span className="text-white font-mono text-base font-medium">
                                         {session.clock_in ? new Date(session.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
+                                      </span>
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-8 py-5">
+                                  {editingAttendance?.id === session.id ? (
+                                    <span className="text-white/20 text-xs italic">—</span>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-[#D0B079]/40" />
+                                      <span className="text-[#D0B079] font-mono text-base font-bold">
+                                        {session.clock_in ? getCalculatedTime(new Date(session.clock_in)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
                                       </span>
                                     </div>
                                   )}
@@ -1109,12 +1119,12 @@ export default function AllStaffPage() {
                               </tr>
                             ))}
                             {/* Spacer between days */}
-                            <tr className="h-4"><td colSpan="4"></td></tr>
+                            <tr className="h-4"><td colSpan="5"></td></tr>
                           </React.Fragment>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="4" className="px-6 py-32 text-center text-white/10 font-black tracking-[0.2em] text-xs uppercase">
+                          <td colSpan="5" className="px-6 py-32 text-center text-white/10 font-black tracking-[0.2em] text-xs uppercase">
                             No logs found for this period
                           </td>
                         </tr>
