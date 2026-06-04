@@ -56,3 +56,53 @@ exports.deleteAuthUser = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", error.message);
   }
 });
+
+exports.sendPushNotification = functions.https.onCall(async (data, context) => {
+  // Ensure the user is authenticated (optional, but recommended)
+  // if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Unauthorized");
+
+  const { fcm_token, title, body, priority, type, notificationId } = data;
+
+  if (!fcm_token || !title || !body) {
+    throw new functions.https.HttpsError("invalid-argument", "Missing required fields");
+  }
+
+  const message = {
+    token: fcm_token,
+    notification: {
+      title: title,
+      body: body,
+    },
+    data: {
+      notificationId: String(notificationId || ""),
+      type: String(type || "announcement"),
+      priority: String(priority || "normal"),
+    },
+    android: {
+      priority: "high",
+      notification: {
+        channelId: "high_importance_channel",
+        sound: "default",
+        defaultSound: true,
+        priority: "max",
+        visibility: "public"
+      }
+    },
+    apns: {
+      payload: {
+        aps: {
+          sound: "default",
+          badge: 1
+        }
+      }
+    }
+  };
+
+  try {
+    const response = await admin.messaging().send(message);
+    return { success: true, messageId: response };
+  } catch (error) {
+    console.error("Error sending FCM:", error);
+    throw new functions.https.HttpsError("internal", error.message);
+  }
+});

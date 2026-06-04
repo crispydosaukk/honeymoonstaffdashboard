@@ -151,10 +151,27 @@ export default function NotificationsPage() {
         throw new Error("No staff members found matching the selected criteria");
       }
 
-      // 4. Create Notification Records
-      console.log("Sending broadcast to:", targetStaff.map(s => s.full_name));
-      
+      // 4. Send Push Notifications INSTANTLY (before waiting for slow database saves)
       const broadcastId = `bcast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      if (!formData.scheduledFor) {
+        targetStaff.forEach((s) => {
+          if (s.fcmToken || s.fcm_token) {
+            // Fire and forget without awaiting to ensure instant delivery
+            sendPushNotification({
+              fcm_token: s.fcmToken || s.fcm_token,
+              title: formData.title,
+              body: formData.message,
+              priority: formData.priority,
+              type: formData.type,
+              notificationId: broadcastId
+            }).catch(e => console.error("FCM Send Error:", e));
+          }
+        });
+      }
+
+      // 5. Create Notification Records in Background
+      console.log("Sending broadcast to:", targetStaff.map(s => s.full_name));
       const targetRestName = formData.targetRestaurant === 'all' ? 'All Restaurants' : restaurants.find(r => r.id === formData.targetRestaurant)?.restaurant_name || 'Selected Restaurant';
       const targetRoleName = formData.targetDesignation === 'all' ? 'All Roles' : formData.targetDesignation;
       const targetGroup = `${targetRestName} • ${targetRoleName}`;
@@ -178,26 +195,7 @@ export default function NotificationsPage() {
         });
       });
 
-      const results = await Promise.all(promises);
-
-      // 5. Send Push Notifications directly from Frontend
-      // (This replaces the Cloud Function logic)
-      if (!formData.scheduledFor) {
-        targetStaff.forEach((s, index) => {
-          const docRef = results[index];
-          if (s.fcmToken || s.fcm_token) {
-            sendPushNotification({
-              fcm_token: s.fcmToken || s.fcm_token,
-              title: formData.title,
-              body: formData.message,
-              priority: formData.priority,
-              type: formData.type,
-              notificationId: docRef.id
-            });
-          }
-        });
-      }
-
+      await Promise.all(promises);
 
       const staffNames = targetStaff.map(s => s.full_name).join(', ');
       console.log(`[Notification] Sent to: ${staffNames}`);
