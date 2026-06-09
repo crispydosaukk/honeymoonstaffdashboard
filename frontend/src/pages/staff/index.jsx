@@ -453,18 +453,7 @@ export default function StaffManagement() {
   const formatTimeWithDateDiff = (cinStr, coutStr) => {
     if (!coutStr) return "--:--";
     const cout = coutStr instanceof Date ? coutStr : new Date(coutStr);
-    const timeStr = cout.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-    if (cinStr) {
-      const cin = cinStr instanceof Date ? cinStr : new Date(cinStr);
-      if (cout.getDate() !== cin.getDate() || cout.getMonth() !== cin.getMonth() || cout.getFullYear() !== cin.getFullYear()) {
-        const coutDate = new Date(cout.getFullYear(), cout.getMonth(), cout.getDate());
-        const cinDate = new Date(cin.getFullYear(), cin.getMonth(), cin.getDate());
-        const diffDays = Math.round((coutDate.getTime() - cinDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (diffDays === 1) return `${timeStr} (next day)`;
-        if (diffDays > 1) return `${timeStr} (+${diffDays} days)`;
-      }
-    }
-    return timeStr;
+    return cout.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
   // Recalculate minutes from actual timestamps using calculated (rounded) times
@@ -1027,7 +1016,7 @@ export default function StaffManagement() {
                     <div className="text-center">
                       <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-0.5">Total Hours</p>
                       <p className="text-lg font-black text-[#D0B079]">
-                        {formatWorkTime(attendanceData?.records?.reduce((sum, r) => sum + (r.total_minutes || 0), 0))}
+                        {formatWorkTime(attendanceData?.records?.reduce((sum, r) => sum + calcSessionMinutes(r), 0))}
                       </p>
                     </div>
                     <div className="w-px h-8 bg-white/10" />
@@ -1212,10 +1201,10 @@ export default function StaffManagement() {
                                     ) : (
                                       <>
                                         <div className="flex flex-col items-end">
-                                          <span className={`text-sm font-black tracking-tight ${session.total_minutes === 0 ? 'text-rose-400/60' : 'text-[#D0B079]'}`}>
-                                            {formatWorkTime(session.total_minutes)}
+                                          <span className={`text-sm font-black tracking-tight ${(session._calc_minutes != null ? session._calc_minutes : calcSessionMinutes(session)) === 0 ? 'text-rose-400/60' : 'text-[#D0B079]'}`}>
+                                            {formatWorkTime(session._calc_minutes != null ? session._calc_minutes : calcSessionMinutes(session))}
                                           </span>
-                                          {session.total_minutes === 0 && (
+                                          {(session._calc_minutes != null ? session._calc_minutes : calcSessionMinutes(session)) === 0 && (
                                             <span className="text-[8px] font-black text-rose-500/40 uppercase tracking-widest mt-0.5">Short Session</span>
                                           )}
                                         </div>

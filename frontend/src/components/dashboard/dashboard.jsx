@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { usePopup } from "../../context/PopupContext";
 import { useAuth } from "../../context/AuthContext";
 import { sendPushNotification } from "../../utils/fcm";
+import { calcCalculatedMinutes } from "../../utils/timeRounding";
 
 
 // --- Helpers ---
@@ -406,13 +407,11 @@ export default function Dashboard() {
       };
     });
 
-    // Recalculate total_minutes from actual timestamps instead of trusting stored values
+    // Recalculate total_minutes from calculated timestamps
     const totalMinutesToday = filteredAttendance.reduce((sum, r) => {
       if (r.clock_in && r.clock_out) {
-        const cin = r.clock_in?.toDate ? r.clock_in.toDate() : new Date(r.clock_in);
-        const cout = r.clock_out?.toDate ? r.clock_out.toDate() : new Date(r.clock_out);
-        const diff = Math.floor((cout.getTime() - cin.getTime()) / 60000);
-        return sum + Math.max(0, Math.min(diff, 1440)); // cap at 24h per session
+        const diff = calcCalculatedMinutes(r.clock_in, r.clock_out);
+        return sum + diff;
       }
       return sum;
     }, 0);

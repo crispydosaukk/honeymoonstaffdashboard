@@ -83,8 +83,19 @@ export function formatTimeShort(timestamp) {
  */
 export function calcCalculatedMinutes(clockIn, clockOut) {
   const calcIn = getCalculatedTime(clockIn);
-  const calcOut = getCalculatedTime(clockOut);
-  if (!calcIn || !calcOut) return 0;
-  const diff = Math.floor((calcOut.getTime() - calcIn.getTime()) / 60000);
+  if (!calcIn || !clockOut) return 0;
+
+  let actualOut;
+  if (clockOut?.toDate) {
+    actualOut = clockOut.toDate();
+  } else if (clockOut instanceof Date) {
+    actualOut = clockOut;
+  } else {
+    actualOut = new Date(clockOut);
+  }
+
+  if (isNaN(actualOut.getTime())) return 0;
+
+  const diff = Math.floor((actualOut.getTime() - calcIn.getTime()) / 60000);
   return Math.max(0, Math.min(diff, 1440));
 }
