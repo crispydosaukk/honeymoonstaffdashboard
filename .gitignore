@@ -6,3 +6,4 @@ backend/firebaseServiceAccount.json
 backend/.env
 frontend/.env
 *.log
+functions/serviceAccountKey.json

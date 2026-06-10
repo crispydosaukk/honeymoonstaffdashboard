@@ -1374,7 +1374,7 @@ export default function StaffManagement() {
                                   )}
                                 </td>
                                 <td className="px-4 py-4 font-mono font-bold" style={{ color: '#475569' }}>
-                                  {session.clock_in ? new Date(session.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
+                                  {session.clock_in ? getCalculatedTime(new Date(session.clock_in)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
                                 </td>
                                 <td className="px-4 py-4 font-mono font-bold" style={{ color: '#475569' }}>
                                   {formatTimeWithDateDiff(session.clock_in, session.clock_out)}
