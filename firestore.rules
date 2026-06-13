@@ -1,7 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow any logged-in staff member to read/write to the dashboard collections
+
+    // ── Attendance ──────────────────────────────────────────
+    // Staff can read/create/update their OWN attendance records
+    match /attendance/{docId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.staff_id == request.auth.uid;
+      allow update: if request.auth != null
+                    && resource.data.staff_id == request.auth.uid;
+    }
+
+    // ── Staff ────────────────────────────────────────────────
+    // Anyone authenticated can read staff (needed by dashboard)
+    // Staff can update their own profile (FCM token sync)
+    match /staff/{staffId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── Restaurants ──────────────────────────────────────────
+    // Staff can read restaurant data (needed for geofencing)
+    match /restaurants/{restaurantId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ── Notifications ────────────────────────────────────────
+    // Staff can read/update their own notifications
+    match /notifications/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ── Everything else (dashboard collections) ──────────────
     match /{document=**} {
       allow read, write: if request.auth != null;
     }

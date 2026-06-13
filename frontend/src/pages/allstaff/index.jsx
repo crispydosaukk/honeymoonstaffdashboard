@@ -978,14 +978,15 @@ export default function AllStaffPage() {
                         <th className="px-8 py-5 text-[10px] font-black tracking-widest text-white/30 uppercase">Timeline</th>
                         <th className="px-8 py-5 text-[10px] font-black tracking-widest text-white/30 uppercase">Actual Clock-In</th>
                         <th className="px-8 py-5 text-[10px] font-black tracking-widest text-[#D0B079]/50 uppercase">Calc. Clock-In</th>
-                        <th className="px-8 py-5 text-[10px] font-black tracking-widest text-white/30 uppercase">Clock-Out</th>
+                        <th className="px-8 py-5 text-[10px] font-black tracking-widest text-white/30 uppercase">Actual Clock-Out</th>
+                         <th className="px-8 py-5 text-[10px] font-black tracking-widest text-[#D0B079]/50 uppercase">Calc. Clock-Out</th>
                         <th className="px-8 py-5 text-[10px] font-black tracking-widest text-white/30 uppercase text-right">Duration</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {loadingAttendance ? (
                         <tr>
-                          <td colSpan="5" className="px-6 py-32 text-center">
+                          <td colSpan="6" className="px-6 py-32 text-center">
                             <Loader2 className="animate-spin inline-block text-[#D0B079] mb-4" size={48} />
                             <p className="text-white/20 font-black tracking-[0.2em] text-xs uppercase">Synchronizing Logs...</p>
                           </td>
@@ -995,7 +996,7 @@ export default function AllStaffPage() {
                           <React.Fragment key={group.dateKey}>
                             {/* Day Header Row */}
                             <tr className="bg-[#D0B079]/5 border-y border-[#D0B079]/10">
-                              <td colSpan="4" className="px-8 py-4">
+                              <td colSpan="5" className="px-8 py-4">
                                 <div className="flex items-center gap-3">
                                   <Calendar size={14} className="text-[#D0B079]" />
                                   <span className="text-sm font-black text-white tracking-wide">
@@ -1088,6 +1089,18 @@ export default function AllStaffPage() {
                                     </div>
                                   )}
                                 </td>
+                                <td className="px-8 py-5">
+                                  {editingAttendance?.id === session.id ? (
+                                    <span className="text-white/20 text-xs italic">—</span>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-[#D0B079]/40" />
+                                      <span className="text-[#D0B079] font-mono text-base font-bold">
+                                        {session.clock_out ? getCalculatedTime(new Date(session.clock_out)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
+                                      </span>
+                                    </div>
+                                  )}
+                                </td>
                                 <td className="px-8 py-5 text-right">
                                   <div className="flex items-center justify-end gap-6">
                                     {editingAttendance?.id === session.id ? (
@@ -1139,12 +1152,12 @@ export default function AllStaffPage() {
                               </tr>
                             ))}
                             {/* Spacer between days */}
-                            <tr className="h-4"><td colSpan="5"></td></tr>
+                            <tr className="h-4"><td colSpan="6"></td></tr>
                           </React.Fragment>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="5" className="px-6 py-32 text-center text-white/10 font-black tracking-[0.2em] text-xs uppercase">
+                          <td colSpan="6" className="px-6 py-32 text-center text-white/10 font-black tracking-[0.2em] text-xs uppercase">
                             No logs found for this period
                           </td>
                         </tr>
@@ -1394,7 +1407,7 @@ export default function AllStaffPage() {
                                   {session.clock_in ? getCalculatedTime(new Date(session.clock_in)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
                                 </td>
                                 <td className="px-4 py-4 font-mono font-bold" style={{ color: '#475569' }}>
-                                  {formatTimeWithDateDiff(session.clock_in, session.clock_out)}
+                                  {session.clock_out ? getCalculatedTime(new Date(session.clock_out)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
                                 </td>
                                 <td className="px-4 py-4 text-right font-mono font-black" style={{ color: '#0f172a' }}>
                                   {formatWorkTime(session._calc_minutes != null ? session._calc_minutes : calcSessionMinutes(session))}

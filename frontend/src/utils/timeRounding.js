@@ -76,26 +76,17 @@ export function formatTimeShort(timestamp) {
 }
 
 /**
- * Calculate session duration using calculated (rounded) times
+ * Calculate session duration using calculated (rounded) times for BOTH clock-in and clock-out.
+ * The same 30-min slot rounding with 5-min grace period is applied to clock-out.
  * @param {Date|string|object} clockIn 
  * @param {Date|string|object} clockOut 
  * @returns {number} minutes
  */
 export function calcCalculatedMinutes(clockIn, clockOut) {
   const calcIn = getCalculatedTime(clockIn);
-  if (!calcIn || !clockOut) return 0;
+  const calcOut = getCalculatedTime(clockOut);
+  if (!calcIn || !calcOut) return 0;
 
-  let actualOut;
-  if (clockOut?.toDate) {
-    actualOut = clockOut.toDate();
-  } else if (clockOut instanceof Date) {
-    actualOut = clockOut;
-  } else {
-    actualOut = new Date(clockOut);
-  }
-
-  if (isNaN(actualOut.getTime())) return 0;
-
-  const diff = Math.floor((actualOut.getTime() - calcIn.getTime()) / 60000);
+  const diff = Math.floor((calcOut.getTime() - calcIn.getTime()) / 60000);
   return Math.max(0, Math.min(diff, 1440));
 }

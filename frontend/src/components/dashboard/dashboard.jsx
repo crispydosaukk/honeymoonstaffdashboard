@@ -862,8 +862,8 @@ export default function Dashboard() {
                        <tr>
                          <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-white/40">Staff member</th>
                          <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-white/40">Actual Time</th>
-                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-white/40">Calc. Clock In</th>
-                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-white/40">Clock Out</th>
+                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-[#D0B079]/70">Calc. Clock In</th>
+                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-[#D0B079]/70">Calc. Clock Out</th>
                          <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-white/40 text-right">Status</th>
                        </tr>
                      </thead>
@@ -871,10 +871,11 @@ export default function Dashboard() {
                         {loading ? (
                           <tr><td colSpan="5" className="px-6 py-12 text-center text-white/20 font-bold uppercase tracking-widest text-xs">Loading activity...</td></tr>
                         ) : stats.recent_activity?.length > 0 ? (
-                          stats.recent_activity.map((act, i) => {
+                           stats.recent_activity.map((act, i) => {
                             const actualIn = act.clock_in?.toDate ? act.clock_in.toDate() : new Date(act.clock_in);
                             const actualOut = act.clock_out ? (act.clock_out?.toDate ? act.clock_out.toDate() : new Date(act.clock_out)) : null;
                             const calcIn = getCalculatedTime(actualIn);
+                            const calcOut = actualOut ? getCalculatedTime(actualOut) : null;
                             return (
                             <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
                               <td className="px-4 py-4">
@@ -904,10 +905,10 @@ export default function Dashboard() {
                                 </div>
                               </td>
                               <td className="px-4 py-4">
-                                <span className="text-emerald-400 font-mono text-sm font-bold">{formatTimeShort(calcIn)}</span>
+                                <span className="text-[#D0B079] font-mono text-sm font-bold">{formatTimeShort(calcIn)}</span>
                               </td>
                               <td className="px-4 py-4">
-                                <span className="text-rose-400 font-mono text-sm font-bold">{actualOut ? formatTimeShort(actualOut) : '--:--'}</span>
+                                <span className="text-[#D0B079] font-mono text-sm font-bold">{calcOut ? formatTimeShort(calcOut) : '--:--'}</span>
                               </td>
                               <td className="px-4 py-4 text-right">
                                 <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
