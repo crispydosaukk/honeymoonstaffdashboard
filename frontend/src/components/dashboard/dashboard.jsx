@@ -6,7 +6,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import {
   Users, ArrowRight, CheckCircle, Clock, X,
-  TrendingUp, ChevronDown, LayoutDashboard, XCircle, Shield, Calendar, Filter, Search, User, AlertTriangle, BellRing, Loader2
+  TrendingUp, TrendingDown, ChevronDown, LayoutDashboard, XCircle, Shield, Calendar, Filter, Search, User, AlertTriangle, BellRing, Loader2, PoundSterling, History
 } from "lucide-react";
 
 
@@ -37,6 +37,16 @@ const getAutoLogoutTime = (clockIn) => {
     logoutTime.setHours(18, 0, 0, 0);
   }
   return logoutTime;
+};
+
+const getTrend = (current, previous) => {
+  if (previous === 0) return current > 0 ? { text: "+100%", isUp: true } : { text: "0%", isUp: false };
+  const diff = current - previous;
+  const percent = (diff / previous) * 100;
+  return {
+    text: `${percent > 0 ? '+' : ''}${percent.toFixed(1)}%`,
+    isUp: percent > 0
+  };
 };
 
 // --- Components ---
@@ -80,8 +90,10 @@ const StatCard = ({ title, value, subtext, icon: Icon, colorClass, delay, onEyeC
             </button>
           )}
           {trend && (
-            <div className="flex items-center gap-1 bg-[#D0B079]/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[#D0B079] text-[9px] sm:text-[10px] font-black border border-[#D0B079]/20 shadow-sm">
-              <TrendingUp size={10} /> {trend}
+            <div className={`flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[9px] sm:text-[10px] font-black border shadow-sm ${
+              trend.isUp ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+            }`}>
+              {trend.isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />} {trend.text}
             </div>
           )}
         </div>
@@ -111,6 +123,9 @@ export default function Dashboard() {
   const roleId = String(userData?.role_id || "");
   const isSuper = roleId === "6" || roleTitle === "super admin" || roleTitle === "superadmin" || perms?.includes("all_staff");
 
+  const [activityPage, setActivityPage] = useState(1);
+  const itemsPerPage = 10;
+  
   const [stats, setStats] = useState({
     total_staff: 0,
     present_today: 0,
@@ -139,6 +154,7 @@ export default function Dashboard() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [showPendingClockouts, setShowPendingClockouts] = useState(false);
+  const [showYesterdayClockouts, setShowYesterdayClockouts] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
 
   const handleRemindAll = async (e) => {
@@ -219,16 +235,16 @@ export default function Dashboard() {
     const from = new Date();
     const to = new Date();
 
-    if (p === 'today') {
+    if (p === 'today' || p === 'today_vs') {
       // already set
     } else if (p === 'yesterday') {
       from.setDate(from.getDate() - 1);
       to.setDate(to.getDate() - 1);
     } else if (p === '3days') {
       from.setDate(from.getDate() - 2);
-    } else if (p === 'week') {
+    } else if (p === 'week' || p === 'week_vs') {
       from.setDate(from.getDate() - 7);
-    } else if (p === 'month') {
+    } else if (p === 'month' || p === 'month_vs') {
       from.setMonth(from.getMonth() - 1);
     } else if (p === 'quarter') {
       from.setMonth(from.getMonth() - 3);
@@ -417,13 +433,15 @@ export default function Dashboard() {
     }, 0);
     const totalHoursToday = (totalMinutesToday / 60).toFixed(1);
 
-    const recentActivity = filteredAttendance.slice(0, 10).map(r => {
+    const recentActivity = filteredAttendance.map(r => {
       const s = filteredStaff.find(staff => staff.id === r.staff_id);
+      const rest = isSuper && restaurants ? restaurants.find(res => String(res.id) === String(s?.restaurant_id || s?.created_by)) : null;
       return {
         ...r,
         full_name: s?.full_name || "Unknown Staff",
         profile_image: s?.profile_image,
-        designation: s?.designation
+        designation: s?.designation,
+        restaurant_name: rest?.restaurant_name || s?.restaurant_name || "Unknown Restaurant"
       };
     });
 
@@ -446,6 +464,86 @@ export default function Dashboard() {
       weeklyData.push({ day: dayName, count: dayCount });
     }
 
+    // -- Cost Metrics Calculation --
+    const nowCost = new Date();
+    const startOfLastMonth = new Date(nowCost.getFullYear(), nowCost.getMonth() - 1, 1);
+    
+    const durationMs = toDate.getTime() - fromDate.getTime() + 1;
+    const prevFromDate = new Date(fromDate.getTime() - durationMs);
+    const prevToDate = new Date(toDate.getTime() - durationMs);
+
+    const costQueryStart = new Date(Math.min(startOfLastMonth.getTime(), prevFromDate.getTime()));
+
+    const costQuery = query(
+      collection(db, "attendance"),
+      where("clock_in", ">=", costQueryStart)
+    );
+    const costSnap = await getDocs(costQuery);
+    const costRecords = costSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    const staffMap = {};
+    filteredStaff.forEach(s => {
+      staffMap[s.id] = { ...s, hourly_rate: parseFloat(s.hourly_rate) || 0 };
+    });
+
+    const filteredCostRecords = costRecords.filter(r => staffMap[r.staff_id]);
+
+    const todayStart = new Date(nowCost.getFullYear(), nowCost.getMonth(), nowCost.getDate());
+    const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1);
+    const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    const yesterdayEnd = new Date(todayStart);
+
+    const dayOfWeek = nowCost.getDay(); // 0 = Sun, 1 = Mon
+    const diffToMonday = nowCost.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    const thisWeekStart = new Date(nowCost.getFullYear(), nowCost.getMonth(), diffToMonday);
+    const lastWeekStart = new Date(thisWeekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+    const lastWeekEnd = new Date(thisWeekStart);
+
+    const thisMonthStart = new Date(nowCost.getFullYear(), nowCost.getMonth(), 1);
+    const lastMonthEnd = new Date(thisMonthStart);
+
+    const costMetrics = {
+      today: 0, yesterday: 0,
+      thisWeek: 0, lastWeek: 0,
+      thisMonth: 0, lastMonth: 0,
+      selectedPeriod: 0, prevSelectedPeriod: 0
+    };
+
+    const yesterdayClockOuts = [];
+
+    filteredCostRecords.forEach(r => {
+      if (r.clock_out) {
+        const cout = r.clock_out?.toDate ? r.clock_out.toDate() : new Date(r.clock_out);
+        if (cout >= yesterdayStart && cout < yesterdayEnd) {
+          const s = staffMap[r.staff_id];
+          const rest = isSuper && restaurants ? restaurants.find(res => String(res.id) === String(s?.restaurant_id || s?.created_by)) : null;
+          yesterdayClockOuts.push({
+            ...r,
+            full_name: s?.full_name || "Unknown",
+            profile_image: s?.profile_image,
+            restaurant_name: rest?.restaurant_name || s?.restaurant_name || "Unknown Restaurant"
+          });
+        }
+      }
+
+      if (!r.clock_in || !r.clock_out) return; 
+
+      const cin = r.clock_in?.toDate ? r.clock_in.toDate() : new Date(r.clock_in);
+      const mins = calcCalculatedMinutes(r.clock_in, r.clock_out);
+      const hours = mins / 60;
+      const rate = staffMap[r.staff_id].hourly_rate;
+      const cost = hours * rate;
+
+      if (cin >= todayStart && cin < todayEnd) costMetrics.today += cost;
+      if (cin >= yesterdayStart && cin < yesterdayEnd) costMetrics.yesterday += cost;
+      if (cin >= thisWeekStart) costMetrics.thisWeek += cost;
+      if (cin >= lastWeekStart && cin < lastWeekEnd) costMetrics.lastWeek += cost;
+      if (cin >= thisMonthStart) costMetrics.thisMonth += cost;
+      if (cin >= startOfLastMonth && cin < lastMonthEnd) costMetrics.lastMonth += cost;
+      if (cin >= fromDate && cin <= toDate) costMetrics.selectedPeriod += cost;
+      if (cin >= prevFromDate && cin <= prevToDate) costMetrics.prevSelectedPeriod += cost;
+    });
+
     setStats(prev => ({
       ...prev,
       total_staff: filteredStaff.length,
@@ -454,7 +552,13 @@ export default function Dashboard() {
       pending_clockouts: pendingClockouts,
       total_hours_today: totalHoursToday,
       recent_activity: recentActivity,
-      weekly_data: weeklyData
+      weekly_data: weeklyData,
+      cost_metrics: costMetrics,
+      yesterday_clock_outs: yesterdayClockOuts.sort((a, b) => {
+        const ta = a.clock_out?.toDate ? a.clock_out.toDate() : new Date(a.clock_out);
+        const tb = b.clock_out?.toDate ? b.clock_out.toDate() : new Date(b.clock_out);
+        return tb - ta;
+      })
     }));
 
     setLoading(false);
@@ -633,6 +737,9 @@ export default function Dashboard() {
                       <span className="flex-1 sm:flex-none whitespace-nowrap">
                         {period === 'custom' ? `${dateRange.from} to ${dateRange.to}` : 
                          period === '3days' ? 'Last 3 Days' :
+                         period === 'today_vs' ? 'Today vs. Yesterday' :
+                         period === 'week_vs' ? 'This Week vs. Last Week' :
+                         period === 'month_vs' ? 'This Month vs. Last Month' :
                          period.charAt(0).toUpperCase() + period.slice(1)}
                       </span>
                       <ChevronDown size={16} className={`transition-transform duration-300 ${showPeriodMenu ? 'rotate-180' : ''}`} />
@@ -655,6 +762,9 @@ export default function Dashboard() {
                               { id: 'yesterday', label: 'Yesterday' },
                               { id: '3days', label: 'Last 3 Days' },
                               { id: 'week', label: 'This Week' },
+                              { id: 'today_vs', label: 'Today vs. Yesterday' },
+                              { id: 'week_vs', label: 'This Week vs. Last Week' },
+                              { id: 'month_vs', label: 'This Month vs. Last Month' },
                               { id: 'custom', label: 'Custom Range' }
                             ].map((opt) => (
                               <div key={opt.id} className="w-full">
@@ -714,9 +824,9 @@ export default function Dashboard() {
 
             {/* Pending Clock-Outs Dropdown */}
             <div className="mb-8 bg-[#0b1a3d] border border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-lg">
-              <button
+              <div
                 onClick={() => setShowPendingClockouts(!showPendingClockouts)}
-                className={`w-full flex items-center justify-between p-4 sm:p-5 transition-all ${
+                className={`cursor-pointer w-full flex items-center justify-between p-4 sm:p-5 transition-all ${
                   stats.pending_clockouts?.length > 0 ? 'bg-rose-500/10 hover:bg-rose-500/20' : 'bg-white/5 hover:bg-white/10'
                 }`}
               >
@@ -738,7 +848,10 @@ export default function Dashboard() {
                 <div className="flex items-center gap-3">
                   {stats.pending_clockouts?.length > 0 && (
                     <button
-                      onClick={handleRemindAll}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemindAll();
+                      }}
                       disabled={sendingReminders}
                       className="flex items-center gap-2 px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-rose-500/20 disabled:opacity-50"
                     >
@@ -748,7 +861,7 @@ export default function Dashboard() {
                   )}
                   <ChevronDown size={20} className={`transition-transform duration-300 ${stats.pending_clockouts?.length > 0 ? 'text-rose-400' : 'text-emerald-400'} ${showPendingClockouts ? 'rotate-180' : ''}`} />
                 </div>
-              </button>
+              </div>
 
               <AnimatePresence>
                 {showPendingClockouts && (
@@ -785,6 +898,86 @@ export default function Dashboard() {
                           <CheckCircle size={32} className="text-emerald-400/50 mx-auto mb-3" />
                           <p className="text-emerald-400 font-bold">All clear!</p>
                           <p className="text-white/50 text-sm mt-1">There are no staff members currently logged in.</p>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Yesterday's Clock-Outs Dropdown */}
+            <div className="mb-8 bg-[#0b1a3d] border border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-lg">
+              <div
+                onClick={() => setShowYesterdayClockouts(!showYesterdayClockouts)}
+                className={`cursor-pointer w-full flex items-center justify-between p-4 sm:p-5 transition-all ${
+                  stats.yesterday_clock_outs?.length > 0 ? 'bg-[#D0B079]/10 hover:bg-[#D0B079]/20' : 'bg-white/5 hover:bg-white/10'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`p-2.5 rounded-xl shrink-0 ${stats.yesterday_clock_outs?.length > 0 ? 'bg-[#D0B079]/20 text-[#D0B079]' : 'bg-white/10 text-white/40'}`}>
+                    <History size={20} />
+                  </div>
+                  <div className="text-left">
+                    <h3 className={`text-base font-bold mb-0.5 ${stats.yesterday_clock_outs?.length > 0 ? 'text-[#D0B079]' : 'text-white/40'}`}>
+                      Yesterday's Clock-Outs ({stats.yesterday_clock_outs?.length || 0})
+                    </h3>
+                    <p className="text-xs text-white/60">
+                      {stats.yesterday_clock_outs?.length > 0
+                        ? 'Staff members who clocked out yesterday. Expand to view.'
+                        : 'No clock-outs recorded for yesterday.'}
+                    </p>
+                  </div>
+                </div>
+                <ChevronDown size={20} className={`transition-transform duration-300 ${stats.yesterday_clock_outs?.length > 0 ? 'text-[#D0B079]' : 'text-white/40'} ${showYesterdayClockouts ? 'rotate-180' : ''}`} />
+              </div>
+
+              <AnimatePresence>
+                {showYesterdayClockouts && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="border-t border-white/5">
+                      {stats.yesterday_clock_outs?.length > 0 ? (
+                        <div className="overflow-x-auto max-h-[400px] custom-scrollbar">
+                          <table className="w-full text-left">
+                            <thead className="bg-white/5 border-b border-white/10 sticky top-0 z-10 backdrop-blur-md">
+                              <tr>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-white/40">Staff Name</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-white/40">Restaurant</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#D0B079]/70 text-right">Clock Out</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                              {stats.yesterday_clock_outs.map((staff, idx) => (
+                                <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                                  <td className="px-6 py-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[#D0B079] font-bold text-xs overflow-hidden shrink-0">
+                                        {staff.profile_image ? <img src={staff.profile_image} className="w-full h-full object-cover" /> : staff.full_name?.[0]}
+                                      </div>
+                                      <p className="text-white font-bold text-sm truncate">{staff.full_name}</p>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 text-white/60 font-medium text-xs">{staff.restaurant_name}</td>
+                                  <td className="px-6 py-4 text-right">
+                                    <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg font-mono text-xs font-bold inline-block">
+                                      {new Date(staff.clock_out?.toDate ? staff.clock_out.toDate() : staff.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <History size={32} className="text-white/20 mx-auto mb-3" />
+                          <p className="text-white/40 font-bold">No Data</p>
+                          <p className="text-white/30 text-sm mt-1">There are no clock-out records for yesterday.</p>
                         </div>
                       )}
                     </div>
@@ -830,6 +1023,52 @@ export default function Dashboard() {
               />
             </div>
 
+            {/* --- Labour Cost Metrics --- */}
+            <div className="mb-8">
+              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <PoundSterling size={20} className="text-[#D0B079]" />
+                Labour Cost Metrics
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                <StatCard
+                  title={
+                    period === 'custom' ? 'Selected Period Cost' :
+                    period === 'today' || period === 'today_vs' ? "Today's Cost" :
+                    period === 'yesterday' ? "Yesterday's Cost" :
+                    period === '3days' ? "Last 3 Days Cost" :
+                    period === 'week' || period === 'week_vs' ? "This Week's Cost" :
+                    period === 'month' || period === 'month_vs' ? "This Month's Cost" :
+                    period === 'quarter' ? "This Qtr's Cost" :
+                    period === 'halfyear' ? "Half Year Cost" : "Selected Period Cost"
+                  }
+                  value={`£${(stats.cost_metrics?.selectedPeriod || 0).toFixed(2)}`}
+                  subtext={`Prev Period: £${(stats.cost_metrics?.prevSelectedPeriod || 0).toFixed(2)}`}
+                  icon={PoundSterling}
+                  colorClass="bg-[#D0B079]/20 border border-yellow-400/30"
+                  trend={stats.cost_metrics ? getTrend(stats.cost_metrics.selectedPeriod, stats.cost_metrics.prevSelectedPeriod) : null}
+                  delay={0.1}
+                />
+                <StatCard
+                  title="This Week's Cost"
+                  value={`£${(stats.cost_metrics?.thisWeek || 0).toFixed(2)}`}
+                  subtext={`Last Week: £${(stats.cost_metrics?.lastWeek || 0).toFixed(2)}`}
+                  icon={PoundSterling}
+                  colorClass="bg-[#D0B079]/20 border border-yellow-400/30"
+                  trend={stats.cost_metrics ? getTrend(stats.cost_metrics.thisWeek, stats.cost_metrics.lastWeek) : null}
+                  delay={0.2}
+                />
+                <StatCard
+                  title="This Month's Cost"
+                  value={`£${(stats.cost_metrics?.thisMonth || 0).toFixed(2)}`}
+                  subtext={`Last Month: £${(stats.cost_metrics?.lastMonth || 0).toFixed(2)}`}
+                  icon={PoundSterling}
+                  colorClass="bg-[#D0B079]/20 border border-yellow-400/30"
+                  trend={stats.cost_metrics ? getTrend(stats.cost_metrics.thisMonth, stats.cost_metrics.lastMonth) : null}
+                  delay={0.3}
+                />
+              </div>
+            </div>
+
             <div className="mb-8">
               <ChartCard title="Weekly Attendance Trends" subtitle="Attendance volume over the last 7 days" delay={0.35}>
                  <ResponsiveContainer width="100%" height={250}>
@@ -854,13 +1093,14 @@ export default function Dashboard() {
             </div>
 
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              <ChartCard title="Recent Activity" subtitle="Real-time attendance log" delay={0.4} className="lg:col-span-2">
+            <div className="grid grid-cols-1 gap-6 mb-8">
+              <ChartCard title="Recent Activity" subtitle="Real-time attendance log" delay={0.4}>
                 <div className="overflow-x-auto h-full">
                    <table className="w-full text-left">
                      <thead className="bg-white/5 border-b border-white/10">
                        <tr>
                          <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-white/40">Staff member</th>
+                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-white/40">Restaurant</th>
                          <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-white/40">Actual Time</th>
                          <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-[#D0B079]/70">Calc. Clock In</th>
                          <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-[#D0B079]/70">Calc. Clock Out</th>
@@ -869,9 +1109,9 @@ export default function Dashboard() {
                      </thead>
                      <tbody className="divide-y divide-white/5">
                         {loading ? (
-                          <tr><td colSpan="5" className="px-6 py-12 text-center text-white/20 font-bold uppercase tracking-widest text-xs">Loading activity...</td></tr>
+                          <tr><td colSpan="6" className="px-6 py-12 text-center text-white/20 font-bold uppercase tracking-widest text-xs">Loading activity...</td></tr>
                         ) : stats.recent_activity?.length > 0 ? (
-                           stats.recent_activity.map((act, i) => {
+                           stats.recent_activity.slice((activityPage - 1) * itemsPerPage, activityPage * itemsPerPage).map((act, i) => {
                             const actualIn = act.clock_in?.toDate ? act.clock_in.toDate() : new Date(act.clock_in);
                             const actualOut = act.clock_out ? (act.clock_out?.toDate ? act.clock_out.toDate() : new Date(act.clock_out)) : null;
                             const calcIn = getCalculatedTime(actualIn);
@@ -888,6 +1128,9 @@ export default function Dashboard() {
                                     <p className="text-[10px] text-white/30 font-medium uppercase tracking-wider">{act.designation || 'Staff'}</p>
                                   </div>
                                 </div>
+                              </td>
+                              <td className="px-4 py-4">
+                                <span className="text-white/60 font-medium text-xs">{act.restaurant_name}</span>
                               </td>
                               <td className="px-4 py-4">
                                 <div className="flex flex-col">
@@ -920,49 +1163,34 @@ export default function Dashboard() {
                             </tr>
                           );})
                         ) : (
-                          <tr><td colSpan="5" className="px-6 py-20 text-center text-white/20 font-bold uppercase tracking-widest text-xs">No activity found today</td></tr>
+                          <tr><td colSpan="6" className="px-6 py-20 text-center text-white/20 font-bold uppercase tracking-widest text-xs">No activity found today</td></tr>
                         )}
                      </tbody>
                    </table>
                 </div>
-              </ChartCard>
 
-              <ChartCard title="Quick Actions" subtitle="One-click operations" delay={0.5}>
-                 <div className="flex flex-col gap-3 h-full">
-                    <button onClick={() => navigate('/allstaff')} className="w-full flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-[#D0B079]/10 hover:border-[#D0B079]/40 transition-all group">
-                       <div className="flex items-center gap-4">
-                          <div className="p-3 bg-[#D0B079]/20 text-[#D0B079] rounded-xl group-hover:bg-[#D0B079] group-hover:text-slate-900 transition-all"><Users size={20} /></div>
-                          <div className="text-left">
-                             <p className="text-white font-bold text-sm">All Staff members</p>
-                             <p className="text-[10px] text-white/30 uppercase tracking-widest">Full Directory</p>
-                          </div>
-                       </div>
-                       <ArrowRight size={18} className="text-white/20 group-hover:text-[#D0B079] transition-all translate-x-0 group-hover:translate-x-1" />
+                {/* Pagination Controls */}
+                {stats.recent_activity?.length > itemsPerPage && (
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-white/10 mt-4 -mx-6 -mb-6 bg-white/[0.02] rounded-b-2xl">
+                    <button
+                      disabled={activityPage === 1}
+                      onClick={() => setActivityPage(prev => Math.max(1, prev - 1))}
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs font-bold text-white transition-all"
+                    >
+                      Previous
                     </button>
-
-                    <button onClick={() => navigate('/staff')} className="w-full flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all group">
-                       <div className="flex items-center gap-4">
-                          <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-xl group-hover:bg-emerald-500 group-hover:text-slate-900 transition-all"><Clock size={20} /></div>
-                          <div className="text-left">
-                             <p className="text-white font-bold text-sm">Register Attendance</p>
-                             <p className="text-[10px] text-white/30 uppercase tracking-widest">Manual Clock-in</p>
-                          </div>
-                       </div>
-                       <ArrowRight size={18} className="text-white/20 group-hover:text-emerald-400 transition-all translate-x-0 group-hover:translate-x-1" />
+                    <span className="text-xs text-white/50">
+                      Page {activityPage} of {Math.ceil(stats.recent_activity.length / itemsPerPage)}
+                    </span>
+                    <button
+                      disabled={activityPage === Math.ceil(stats.recent_activity.length / itemsPerPage)}
+                      onClick={() => setActivityPage(prev => Math.min(Math.ceil(stats.recent_activity.length / itemsPerPage), prev + 1))}
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs font-bold text-white transition-all"
+                    >
+                      Next
                     </button>
-
-                    <button onClick={() => navigate('/access/roles')} className="w-full flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-blue-500/10 hover:border-blue-500/40 transition-all group">
-                       <div className="flex items-center gap-4">
-                          <div className="p-3 bg-blue-500/20 text-blue-400 rounded-xl group-hover:bg-blue-500 group-hover:text-slate-900 transition-all"><Shield size={20} /></div>
-                          <div className="text-left">
-                             <p className="text-white font-bold text-sm">Manage Permissions</p>
-                             <p className="text-[10px] text-white/30 uppercase tracking-widest">Access Control</p>
-                          </div>
-                       </div>
-                       <ArrowRight size={18} className="text-white/20 group-hover:text-blue-400 transition-all translate-x-0 group-hover:translate-x-1" />
-                    </button>
-
-                 </div>
+                  </div>
+                )}
               </ChartCard>
             </div>
           </div>
