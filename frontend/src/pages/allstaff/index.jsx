@@ -594,17 +594,22 @@ export default function AllStaffPage() {
           if (r.staff_id !== reportEmployeeFilter) return false;
           return true;
         });
+        const formatTime = (d) => d ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : "-";
         filteredRecs.forEach((rec, idx) => {
-          const cin = rec.clock_in?.toDate ? rec.clock_in.toDate() : new Date(rec.clock_in);
-          const cout = rec.clock_out?.toDate ? rec.clock_out.toDate() : new Date(rec.clock_out);
+          const actualCin = rec.clock_in?.toDate ? rec.clock_in.toDate() : new Date(rec.clock_in);
+          const actualCout = rec.clock_out?.toDate ? rec.clock_out.toDate() : (rec.clock_out ? new Date(rec.clock_out) : null);
+          
+          const calcCin = getCalculatedTime(actualCin);
+          const calcCout = actualCout ? getCalculatedTime(actualCout) : null;
+
           const bg = idx % 2 === 0 ? "#ffffff" : "#f9fafb";
           const calcMins = calcSessionMinutes(rec);
           const hrs = Math.floor(calcMins / 60);
           const mins = calcMins % 60;
           tableRows += `<tr style="background-color:${bg};border-bottom:1px solid #e5e7eb;">
-            <td style="padding:10px 12px;font-size:13px;color:#111827;">${cin.toLocaleDateString('en-GB')}</td>
-            <td style="padding:10px 12px;font-size:13px;color:#374151;">${cin.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</td>
-            <td style="padding:10px 12px;font-size:13px;color:#374151;">${cout.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</td>
+            <td style="padding:10px 12px;font-size:13px;color:#111827;">${actualCin.toLocaleDateString('en-GB')}</td>
+            <td style="padding:10px 12px;font-size:13px;color:#374151;">${formatTime(calcCin)}</td>
+            <td style="padding:10px 12px;font-size:13px;color:#374151;">${formatTime(calcCout)}</td>
             <td style="padding:10px 12px;font-size:13px;color:#374151;text-align:right;">${hrs}h ${mins}m</td>
           </tr>`;
         });
@@ -647,17 +652,22 @@ export default function AllStaffPage() {
             const db = b.clock_in?.toDate ? b.clock_in.toDate() : new Date(b.clock_in);
             return db - da;
           });
+          const formatTime = (d) => d ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : "-";
           sortedSessions.forEach((sess, idx) => {
-            const cin = sess.clock_in?.toDate ? sess.clock_in.toDate() : new Date(sess.clock_in);
-            const cout = sess.clock_out?.toDate ? sess.clock_out.toDate() : new Date(sess.clock_out);
+            const actualCin = sess.clock_in?.toDate ? sess.clock_in.toDate() : new Date(sess.clock_in);
+            const actualCout = sess.clock_out?.toDate ? sess.clock_out.toDate() : (sess.clock_out ? new Date(sess.clock_out) : null);
+            
+            const calcCin = getCalculatedTime(actualCin);
+            const calcCout = actualCout ? getCalculatedTime(actualCout) : null;
+
             const calcMins = calcSessionMinutes(sess);
             const sHrs = Math.floor(calcMins / 60);
             const sMins = calcMins % 60;
             const bg = idx % 2 === 0 ? "#ffffff" : "#f9fafb";
             tableRows += `<tr style="background-color:${bg};border-bottom:1px solid #e5e7eb;">
-              <td style="padding:8px 12px 8px 24px;font-size:12px;color:#374151;">${cin.toLocaleDateString('en-GB')}</td>
-              <td style="padding:8px 12px;font-size:12px;color:#374151;">${cin.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</td>
-              <td style="padding:8px 12px;font-size:12px;color:#374151;">${cout.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</td>
+              <td style="padding:8px 12px 8px 24px;font-size:12px;color:#374151;">${actualCin.toLocaleDateString('en-GB')}</td>
+              <td style="padding:8px 12px;font-size:12px;color:#374151;">${formatTime(calcCin)}</td>
+              <td style="padding:8px 12px;font-size:12px;color:#374151;">${formatTime(calcCout)}</td>
               <td style="padding:8px 12px;font-size:12px;color:#374151;text-align:right;">${sHrs}h ${sMins}m</td>
             </tr>`;
           });

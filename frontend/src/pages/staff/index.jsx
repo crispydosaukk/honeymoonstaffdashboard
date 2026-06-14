@@ -11,7 +11,7 @@ import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { Shield, Search, Plus, Briefcase, Mail, Phone, Eye, EyeOff, Printer, Edit2, Trash2, Users, UserCheck, X, Camera, Calendar, Loader2, Save, Clock, User, PoundSterling, Store } from "lucide-react";
+import { Shield, Search, Plus, Briefcase, Mail, Phone, Eye, EyeOff, Printer, Edit2, Trash2, Users, UserCheck, X, Camera, Calendar, Loader2, Save, Clock, User, PoundSterling, Store, Send } from "lucide-react";
 
 const InputField = ({ icon: Icon, label, value, onChange, placeholder, type = "text", required = false, autoComplete = "off" }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -665,18 +665,46 @@ export default function StaffManagement() {
       const period = `${attendanceFilters.from || "All Time"} - ${attendanceFilters.to || "Present"}`;
 
       let tableRows = "";
-      if (attendanceData?.records) {
-        attendanceData.records.forEach((rec, idx) => {
-          const cin = rec.clock_in?.toDate ? rec.clock_in.toDate() : new Date(rec.clock_in);
-          const cout = rec.clock_out?.toDate ? rec.clock_out.toDate() : new Date(rec.clock_out);
-          const bg = idx % 2 === 0 ? "#ffffff" : "#f9fafb";
-          tableRows += `<tr style="background-color:${bg};border-bottom:1px solid #e5e7eb;">
-            <td style="padding:10px 12px;font-size:13px;color:#111827;">${cin.toLocaleDateString('en-GB')}</td>
-            <td style="padding:10px 12px;font-size:13px;color:#374151;">${cin.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</td>
-            <td style="padding:10px 12px;font-size:13px;color:#374151;">${cout.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</td>
-            <td style="padding:10px 12px;font-size:13px;color:#374151;text-align:right;">${((rec.total_minutes||0)/60).toFixed(2)} hrs</td>
+      let filteredRecs = attendanceData?.records || [];
+      
+      filteredRecs.forEach((rec, idx) => {
+        const actualCin = rec.clock_in?.toDate ? rec.clock_in.toDate() : new Date(rec.clock_in);
+        const actualCout = rec.clock_out?.toDate ? rec.clock_out.toDate() : (rec.clock_out ? new Date(rec.clock_out) : null);
+        
+        const calcCin = getCalculatedTime(actualCin);
+        const calcCout = actualCout ? getCalculatedTime(actualCout) : null;
+        
+        const formatTime = (d) => d ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : "-";
+
+        const bg = idx % 2 === 0 ? "#ffffff" : "#f9fafb";
+        const calcMins = calcSessionMinutes(rec);
+        const hrs = Math.floor(calcMins / 60);
+        const mins = calcMins % 60;
+        tableRows += `<tr style="background-color:${bg};border-bottom:1px solid #e5e7eb;">
+          <td style="padding:10px 12px;font-size:13px;color:#111827;">${actualCin.toLocaleDateString('en-GB')}</td>
+          <td style="padding:10px 12px;font-size:13px;color:#374151;">${formatTime(calcCin)}</td>
+          <td style="padding:10px 12px;font-size:13px;color:#374151;">${formatTime(calcCout)}</td>
+          <td style="padding:10px 12px;font-size:13px;color:#374151;text-align:right;">${hrs}h ${mins}m</td>
+        </tr>`;
+      });
+      
+      if (filteredRecs.length > 0) {
+        const totalMins = filteredRecs.reduce((s, r) => s + calcSessionMinutes(r), 0);
+        const tHrs = Math.floor(totalMins / 60);
+        const tMins = totalMins % 60;
+        const rate = Number(attendanceData?.staff?.hourly_rate || 0);
+        const totalPay = rate > 0 ? (totalMins / 60) * rate : 0;
+        
+        tableRows += `<tr style="background-color:#0b1a3d;">
+          <td style="padding:12px 12px;font-size:13px;font-weight:700;color:white;" colspan="2">TOTAL HOURS</td>
+          <td style="padding:12px 12px;font-size:14px;font-weight:800;color:#D0B079;text-align:right;" colspan="2">${tHrs}h ${tMins}m</td>
+        </tr>`;
+        if (rate > 0) {
+          tableRows += `<tr style="background-color:#1a2f5a;">
+            <td style="padding:12px 12px;font-size:13px;font-weight:700;color:white;" colspan="2">TOTAL PAY (£${rate}/hr)</td>
+            <td style="padding:14px 12px;font-size:18px;font-weight:900;color:#D0B079;text-align:right;" colspan="2">£${totalPay.toFixed(2)}</td>
           </tr>`;
-        });
+        }
       }
 
       const reportHtml = `<div style="font-family:Arial,Helvetica,sans-serif;background-color:#ffffff;padding:0;margin:0;color:#111827;">
@@ -717,17 +745,14 @@ export default function StaffManagement() {
 
       setSendingProgress("Sending Email...");
       const sendEmailReportFunc = httpsCallable(functionsInstance, "sendEmailReport");
-      await sendEmailReportFunc({
-        to: "rahulbadugu22@gmail.com",
-        subject: `Honeymoon Group Attendance Report - ${reportDate}`,
-        htmlBody: `<div style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:0 auto;">
+      const emailHtmlBody = `<div style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:0 auto;">
           <div style="background:#0b1a3d;padding:30px;border-radius:12px 12px 0 0;text-align:center;">
             <h1 style="color:#D0B079;margin:0;font-size:24px;font-weight:800;">HoneyMoon Group</h1>
             <p style="color:#9ca3af;margin:8px 0 0;font-size:13px;letter-spacing:2px;text-transform:uppercase;">Staff Attendance Report</p>
           </div>
           <div style="background:#f9fafb;padding:30px;border:1px solid #e5e7eb;">
             <p style="font-size:15px;color:#374151;">Dear Team,</p>
-            <p style="font-size:15px;color:#374151;line-height:1.6;">Please find the attendance summary report for <strong>${staffName}</strong> attached as a PDF.</p>
+            <p style="font-size:15px;color:#374151;line-height:1.6;">Please find the attendance report for <strong>${staffName}</strong> attached as a PDF.</p>
             <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin:20px 0;">
               <table style="width:100%;border-collapse:collapse;">
                 <tr><td style="padding:8px 0;color:#6b7280;font-size:13px;">Staff</td><td style="padding:8px 0;font-weight:600;color:#111827;font-size:13px;">${staffName}</td></tr>
@@ -739,12 +764,27 @@ export default function StaffManagement() {
           <div style="background:#0b1a3d;padding:20px;border-radius:0 0 12px 12px;text-align:center;">
             <p style="color:#6b7280;font-size:12px;margin:0;">Honeymoon Staff Dashboard - Confidential</p>
           </div>
-        </div>`,
-        attachmentUrl: pdfDataUri,
-        attachmentName: opt.filename
-      });
+        </div>`;
 
-      showPopup({ title: "Email Sent!", message: "Report emailed to rahulbadugu22@gmail.com successfully.", type: "success" });
+      // Send to both recipients
+      await Promise.all([
+        sendEmailReportFunc({
+          to: "rahulbadugu22@gmail.com",
+          subject: `Honeymoon Group Attendance Report - ${reportDate}`,
+          htmlBody: emailHtmlBody,
+          attachmentUrl: pdfDataUri,
+          attachmentName: opt.filename
+        }),
+        sendEmailReportFunc({
+          to: "digitalbotsolutions@gmail.com",
+          subject: `Honeymoon Group Attendance Report - ${reportDate}`,
+          htmlBody: emailHtmlBody,
+          attachmentUrl: pdfDataUri,
+          attachmentName: opt.filename
+        })
+      ]);
+
+      showPopup({ title: "Email Sent!", message: "Report emailed successfully.", type: "success" });
     } catch (error) {
       console.error("Error emailing report:", error);
       showPopup({ title: "Error", message: `Email failed: ${error.message}`, type: "error" });
