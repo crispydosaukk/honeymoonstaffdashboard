@@ -753,47 +753,97 @@ export default function StaffManagement() {
       const restaurantName = attendanceData?.staff?.restaurant_name || "";
       const period = `${attendanceFilters.from || "All Time"} - ${attendanceFilters.to || "Present"}`;
 
+      const isIndividualView = attendanceData?.staff?.id !== "all";
       let tableRows = "";
-      let filteredRecs = attendanceData?.records || [];
       
-      filteredRecs.forEach((rec, idx) => {
-        const actualCin = rec.clock_in?.toDate ? rec.clock_in.toDate() : new Date(rec.clock_in);
-        const actualCout = rec.clock_out?.toDate ? rec.clock_out.toDate() : (rec.clock_out ? new Date(rec.clock_out) : null);
-        
-        const calcCin = getCalculatedTime(actualCin);
-        const calcCout = actualCout ? getCalculatedTime(actualCout) : null;
-        
-        const formatTime = (d) => d ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : "-";
+      if (isIndividualView) {
+        let filteredRecs = attendanceData?.records || [];
+        filteredRecs.forEach((rec, idx) => {
+          const actualCin = rec.clock_in?.toDate ? rec.clock_in.toDate() : new Date(rec.clock_in);
+          const actualCout = rec.clock_out?.toDate ? rec.clock_out.toDate() : (rec.clock_out ? new Date(rec.clock_out) : null);
+          
+          const calcCin = getCalculatedTime(actualCin);
+          const calcCout = actualCout ? getCalculatedTime(actualCout) : null;
+          
+          const formatTime = (d) => d ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : "-";
 
-        const bg = idx % 2 === 0 ? "#ffffff" : "#f9fafb";
-        const calcMins = calcSessionMinutes(rec);
-        const hrs = Math.floor(calcMins / 60);
-        const mins = calcMins % 60;
-        tableRows += `<tr style="background-color:${bg};border-bottom:1px solid #e5e7eb;">
-          <td style="padding:10px 12px;font-size:13px;color:#111827;">${actualCin.toLocaleDateString('en-GB')}</td>
-          <td style="padding:10px 12px;font-size:13px;color:#374151;">${formatTime(calcCin)}</td>
-          <td style="padding:10px 12px;font-size:13px;color:#374151;">${formatTime(calcCout)}</td>
-          <td style="padding:10px 12px;font-size:13px;color:#374151;text-align:right;">${hrs}h ${mins}m</td>
-        </tr>`;
-      });
-      
-      if (filteredRecs.length > 0) {
-        const totalMins = filteredRecs.reduce((s, r) => s + calcSessionMinutes(r), 0);
-        const tHrs = Math.floor(totalMins / 60);
-        const tMins = totalMins % 60;
-        const rate = Number(attendanceData?.staff?.hourly_rate || 0);
-        const totalPay = rate > 0 ? (totalMins / 60) * rate : 0;
-        
-        tableRows += `<tr style="background-color:#0b1a3d;">
-          <td style="padding:12px 12px;font-size:13px;font-weight:700;color:white;" colspan="2">TOTAL HOURS</td>
-          <td style="padding:12px 12px;font-size:14px;font-weight:800;color:#D0B079;text-align:right;" colspan="2">${tHrs}h ${tMins}m</td>
-        </tr>`;
-        if (rate > 0) {
-          tableRows += `<tr style="background-color:#1a2f5a;">
-            <td style="padding:12px 12px;font-size:13px;font-weight:700;color:white;" colspan="2">TOTAL PAY (£${rate}/hr)</td>
-            <td style="padding:14px 12px;font-size:18px;font-weight:900;color:#D0B079;text-align:right;" colspan="2">£${totalPay.toFixed(2)}</td>
+          const bg = idx % 2 === 0 ? "#ffffff" : "#f9fafb";
+          const calcMins = calcSessionMinutes(rec);
+          const hrs = Math.floor(calcMins / 60);
+          const mins = calcMins % 60;
+          tableRows += `<tr style="background-color:${bg};border-bottom:1px solid #e5e7eb;">
+            <td style="padding:10px 12px;font-size:13px;color:#111827;">${actualCin.toLocaleDateString('en-GB')}</td>
+            <td style="padding:10px 12px;font-size:13px;color:#374151;">${formatTime(calcCin)}</td>
+            <td style="padding:10px 12px;font-size:13px;color:#374151;">${formatTime(calcCout)}</td>
+            <td style="padding:10px 12px;font-size:13px;color:#374151;text-align:right;">${hrs}h ${mins}m</td>
           </tr>`;
+        });
+        
+        if (filteredRecs.length > 0) {
+          const totalMins = filteredRecs.reduce((s, r) => s + calcSessionMinutes(r), 0);
+          const tHrs = Math.floor(totalMins / 60);
+          const tMins = totalMins % 60;
+          const rate = Number(attendanceData?.staff?.hourly_rate || 0);
+          const totalPay = rate > 0 ? (totalMins / 60) * rate : 0;
+          
+          tableRows += `<tr style="background-color:#0b1a3d;">
+            <td style="padding:12px 12px;font-size:13px;font-weight:700;color:white;" colspan="2">TOTAL HOURS</td>
+            <td style="padding:12px 12px;font-size:14px;font-weight:800;color:#D0B079;text-align:right;" colspan="2">${tHrs}h ${tMins}m</td>
+          </tr>`;
+          if (rate > 0) {
+            tableRows += `<tr style="background-color:#1a2f5a;">
+              <td style="padding:12px 12px;font-size:13px;font-weight:700;color:white;" colspan="2">TOTAL PAY (£${rate}/hr)</td>
+              <td style="padding:14px 12px;font-size:18px;font-weight:900;color:#D0B079;text-align:right;" colspan="2">£${totalPay.toFixed(2)}</td>
+            </tr>`;
+          }
         }
+      } else {
+        // ── All employees: grouped sessions per person with subtotals ──
+        summaryGroupedRecords.forEach(sg => {
+          const rate = Number(sg.hourly_rate || 0);
+          const tHrs = Math.floor(sg.total_minutes / 60);
+          const tMins = sg.total_minutes % 60;
+          const totalPay = rate > 0 ? (sg.total_minutes / 60) * rate : 0;
+
+          // Staff header row
+          tableRows += `<tr style="background-color:#1e3a5f;">
+            <td style="padding:10px 12px;font-size:13px;font-weight:800;color:#D0B079;" colspan="3">${sg.staff_name || "Unknown"} &nbsp;<span style="font-weight:400;font-size:11px;color:#9ca3af;">${sg.designation || "Staff"} · ${sg.restaurant_name || ""}</span></td>
+            <td style="padding:10px 12px;font-size:12px;color:#9ca3af;text-align:right;">${sg.sessions?.length || 0} session(s)</td>
+          </tr>`;
+
+          // Individual sessions
+          const sortedSessions = [...(sg.sessions || [])].sort((a, b) => {
+            const da = a.clock_in?.toDate ? a.clock_in.toDate() : new Date(a.clock_in);
+            const db = b.clock_in?.toDate ? b.clock_in.toDate() : new Date(b.clock_in);
+            return db - da;
+          });
+          const formatTime = (d) => d ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : "-";
+          sortedSessions.forEach((sess, idx) => {
+            const actualCin = sess.clock_in?.toDate ? sess.clock_in.toDate() : new Date(sess.clock_in);
+            const actualCout = sess.clock_out?.toDate ? sess.clock_out.toDate() : (sess.clock_out ? new Date(sess.clock_out) : null);
+            
+            const calcCin = getCalculatedTime(actualCin);
+            const calcCout = actualCout ? getCalculatedTime(actualCout) : null;
+
+            const calcMins = calcSessionMinutes(sess);
+            const sHrs = Math.floor(calcMins / 60);
+            const sMins = calcMins % 60;
+            const bg = idx % 2 === 0 ? "#ffffff" : "#f9fafb";
+            tableRows += `<tr style="background-color:${bg};border-bottom:1px solid #e5e7eb;">
+              <td style="padding:8px 12px 8px 24px;font-size:12px;color:#374151;">${actualCin.toLocaleDateString('en-GB')}</td>
+              <td style="padding:8px 12px;font-size:12px;color:#374151;">${formatTime(calcCin)}</td>
+              <td style="padding:8px 12px;font-size:12px;color:#374151;">${formatTime(calcCout)}</td>
+              <td style="padding:8px 12px;font-size:12px;color:#374151;text-align:right;">${sHrs}h ${sMins}m</td>
+            </tr>`;
+          });
+
+          // Subtotal row for this staff
+          tableRows += `<tr style="background-color:#f0f4ff;border-top:1px solid #c7d2fe;border-bottom:3px solid #e5e7eb;">
+            <td style="padding:10px 12px 10px 24px;font-size:12px;font-weight:700;color:#1e3a5f;" colspan="2">Subtotal — ${tHrs}h ${tMins}m${rate > 0 ? ` &nbsp;·&nbsp; <span style="color:#b45309;">£${totalPay.toFixed(2)}</span>` : ""}</td>
+            <td style="padding:10px 12px;font-size:12px;color:#374151;text-align:right;" colspan="2">${sg.sessions?.length || 0} session(s)</td>
+          </tr>
+          <tr><td colspan="4" style="padding:4px;background-color:#e5e7eb;"></td></tr>`;
+        });
       }
 
       const reportHtml = `<div style="font-family:Arial,Helvetica,sans-serif;background-color:#ffffff;padding:0;margin:0;color:#111827;">
