@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
-import { getCalculatedTime, calcCalculatedMinutes } from "../../utils/timeRounding";
+import { getCalculatedTime, getCalculatedClockOut, calcCalculatedMinutes } from "../../utils/timeRounding";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Edit2, Save, Loader2, User, Camera, Briefcase, Shield, Calendar, Eye, EyeOff, Clock, XCircle,
@@ -608,7 +608,7 @@ export default function AllStaffPage() {
           const actualCout = rec.clock_out?.toDate ? rec.clock_out.toDate() : (rec.clock_out ? new Date(rec.clock_out) : null);
           
           const calcCin = getCalculatedTime(actualCin);
-          const calcCout = actualCout ? getCalculatedTime(actualCout) : null;
+          const calcCout = actualCout ? getCalculatedClockOut(actualCout) : null;
 
           const bg = idx % 2 === 0 ? "#ffffff" : "#f9fafb";
           const calcMins = calcSessionMinutes(rec);
@@ -666,7 +666,7 @@ export default function AllStaffPage() {
             const actualCout = sess.clock_out?.toDate ? sess.clock_out.toDate() : (sess.clock_out ? new Date(sess.clock_out) : null);
             
             const calcCin = getCalculatedTime(actualCin);
-            const calcCout = actualCout ? getCalculatedTime(actualCout) : null;
+            const calcCout = actualCout ? getCalculatedClockOut(actualCout) : null;
 
             const calcMins = calcSessionMinutes(sess);
             const sHrs = Math.floor(calcMins / 60);

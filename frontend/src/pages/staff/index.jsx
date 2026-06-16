@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
-import { getCalculatedTime, calcCalculatedMinutes } from "../../utils/timeRounding";
+import { getCalculatedTime, getCalculatedClockOut, calcCalculatedMinutes } from "../../utils/timeRounding";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../components/common/header.jsx";
 import Sidebar from "../../components/common/sidebar.jsx";
@@ -763,7 +763,7 @@ export default function StaffManagement() {
           const actualCout = rec.clock_out?.toDate ? rec.clock_out.toDate() : (rec.clock_out ? new Date(rec.clock_out) : null);
           
           const calcCin = getCalculatedTime(actualCin);
-          const calcCout = actualCout ? getCalculatedTime(actualCout) : null;
+          const calcCout = actualCout ? getCalculatedClockOut(actualCout) : null;
           
           const formatTime = (d) => d ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : "-";
 

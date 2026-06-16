@@ -57,6 +57,45 @@ export function getCalculatedTime(timestamp) {
 }
 
 /**
+ * Get the calculated (rounded) time for clock-out based on specific rules:
+ * - Minutes 00-24 -> Round down to the hour
+ * - Minutes 25-54 -> Round to the nearest half hour
+ * - Minutes 55-59 -> Round up to the next hour
+ * @param {Date|string|object} timestamp
+ * @returns {Date|null}
+ */
+export function getCalculatedClockOut(timestamp) {
+  if (!timestamp) return null;
+
+  let date;
+  if (timestamp?.toDate) {
+    date = timestamp.toDate();
+  } else if (timestamp instanceof Date) {
+    date = new Date(timestamp);
+  } else {
+    date = new Date(timestamp);
+  }
+
+  if (isNaN(date.getTime())) return null;
+
+  const minutes = date.getMinutes();
+  const result = new Date(date);
+
+  if (minutes >= 0 && minutes <= 24) {
+    // Round down to the hour
+    result.setMinutes(0, 0, 0);
+  } else if (minutes >= 25 && minutes <= 54) {
+    // Round to the half hour (30)
+    result.setMinutes(30, 0, 0);
+  } else if (minutes >= 55 && minutes <= 59) {
+    // Round up to the next hour
+    result.setHours(result.getHours() + 1, 0, 0, 0);
+  }
+
+  return result;
+}
+
+/**
  * Format a time as HH:MM AM/PM string
  * @param {Date|string|object} timestamp 
  * @returns {string}
@@ -84,7 +123,7 @@ export function formatTimeShort(timestamp) {
  */
 export function calcCalculatedMinutes(clockIn, clockOut) {
   const calcIn = getCalculatedTime(clockIn);
-  const calcOut = getCalculatedTime(clockOut);
+  const calcOut = getCalculatedClockOut(clockOut);
   if (!calcIn || !calcOut) return 0;
 
   const diff = Math.floor((calcOut.getTime() - calcIn.getTime()) / 60000);

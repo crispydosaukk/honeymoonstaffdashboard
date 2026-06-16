@@ -150,7 +150,7 @@ export default function Dashboard() {
   const [showPeriodMenu, setShowPeriodMenu] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
-  const [snapshotPeriod, setSnapshotPeriod] = useState("today_vs");
+  const [snapshotPeriod, setSnapshotPeriod] = useState("yesterday");
   const [showSnapshotMenu, setShowSnapshotMenu] = useState(false);
   const [snapshotRestaurant, setSnapshotRestaurant] = useState("all");
   const [showSnapshotRestMenu, setShowSnapshotRestMenu] = useState(false);
