@@ -1593,7 +1593,7 @@ export default function StaffManagement() {
                                     <div className="flex items-center gap-2">
                                       <div className="w-2 h-2 rounded-full bg-[#D0B079]/40" />
                                       <span className="text-[#D0B079] font-mono text-base font-bold">
-                                        {session.clock_out ? getCalculatedTime(new Date(session.clock_out)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
+                                        {session.clock_out ? getCalculatedClockOut(new Date(session.clock_out)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
                                       </span>
                                     </div>
                                   )}
@@ -1897,7 +1897,7 @@ export default function StaffManagement() {
                                           {session.clock_in ? getCalculatedTime(new Date(session.clock_in)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
                                         </td>
                                         <td className="px-6 py-3 font-mono font-bold text-slate-500">
-                                          {session.clock_out ? getCalculatedTime(new Date(session.clock_out)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
+                                          {session.clock_out ? getCalculatedClockOut(new Date(session.clock_out)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
                                         </td>
                                         <td className="px-6 py-3 text-right font-mono font-black text-slate-900">
                                           {formatWorkTime(session._calc_minutes != null ? session._calc_minutes : calcSessionMinutes(session))}
@@ -1981,7 +1981,7 @@ export default function StaffManagement() {
                                     {session.clock_in ? getCalculatedTime(new Date(session.clock_in)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
                                   </td>
                                   <td className="px-4 py-4 font-mono font-bold" style={{ color: '#475569' }}>
-                                    {session.clock_out ? getCalculatedTime(new Date(session.clock_out)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
+                                    {session.clock_out ? getCalculatedClockOut(new Date(session.clock_out)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : "--:--"}
                                   </td>
                                   <td className="px-4 py-4 text-right font-mono font-black" style={{ color: '#0f172a' }}>
                                     {formatWorkTime(session._calc_minutes != null ? session._calc_minutes : calcSessionMinutes(session))}

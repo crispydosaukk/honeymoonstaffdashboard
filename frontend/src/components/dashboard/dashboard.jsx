@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getCalculatedTime, formatTimeShort } from "../../utils/timeRounding";
+import { getCalculatedTime, getCalculatedClockOut, formatTimeShort } from "../../utils/timeRounding";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend
 } from "recharts";
@@ -1619,7 +1619,7 @@ export default function Dashboard() {
                             const actualIn = act.clock_in?.toDate ? act.clock_in.toDate() : new Date(act.clock_in);
                             const actualOut = act.clock_out ? (act.clock_out?.toDate ? act.clock_out.toDate() : new Date(act.clock_out)) : null;
                             const calcIn = getCalculatedTime(actualIn);
-                            const calcOut = actualOut ? getCalculatedTime(actualOut) : null;
+                            const calcOut = actualOut ? getCalculatedClockOut(actualOut) : null;
                             return (
                             <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
                               <td className="px-4 py-4">
