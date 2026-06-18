@@ -22,6 +22,7 @@ import NotificationsPage from "./pages/notifications/index.jsx";
 import PrivacyPolicy from "./pages/privacy-policy/index.jsx";
 import TermsAndConditions from "./pages/terms-and-conditions/index.jsx";
 import ContactAndSupport from "./pages/contact-and-support/index.jsx";
+import AutoLogoutsPage from "./pages/autologouts/index.jsx";
 import { getSafePath } from "./utils/perm";
 import { useAuth } from "./context/AuthContext";
 
@@ -94,6 +95,14 @@ export default function App() {
           element={
             <PrivateRoute>
               <RequirePerm perm="notifications"><NotificationsPage /></RequirePerm>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/autologouts"
+          element={
+            <PrivateRoute>
+              <RequirePerm perm="auto_logouts"><AutoLogoutsPage /></RequirePerm>
             </PrivateRoute>
           }
         />

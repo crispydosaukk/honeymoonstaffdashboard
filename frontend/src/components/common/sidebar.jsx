@@ -3,7 +3,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { can } from "../../utils/perm";
 import { usePopup } from "../../context/PopupContext";
 import { useAuth } from "../../context/AuthContext";
-import { X } from "lucide-react";
+import { X, ShieldOff } from "lucide-react";
 
 
 
@@ -97,6 +97,7 @@ export default function Sidebar({ open, onClose }) {
       { label: "All Staff", to: "/allstaff", icon: iconAllStaff(), perm: "all_staff" },
       { label: "Staff Management", to: "/staff", icon: iconUsers(), perm: "staff_management" },
       { label: "Notifications", to: "/notifications", icon: iconBell(), perm: "notifications" },
+      { label: "Auto Logouts", to: "/autologouts", icon: <ShieldOff className="w-full h-full" strokeWidth={1.6} />, perm: "auto_logouts" },
     ],
     []
   );

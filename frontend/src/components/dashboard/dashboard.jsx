@@ -171,7 +171,6 @@ export default function Dashboard() {
   const [userSearch, setUserSearch] = useState("");
   const [showPendingClockouts, setShowPendingClockouts] = useState(false);
   const [showYesterdayClockouts, setShowYesterdayClockouts] = useState(false);
-  const [showAutoLogouts, setShowAutoLogouts] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
 
   const handleEmailSnapshot = async () => {
@@ -186,6 +185,13 @@ export default function Dashboard() {
       let pLabel1 = "";
       let pLabel2 = "";
       let isComparative = false;
+
+      const effectiveRestId = snapshotCompareMode 
+        ? null 
+        : (isSuper 
+            ? (snapshotRestaurant !== 'all' ? snapshotRestaurant : (selectedRestaurant || 'all'))
+            : (String(userData?.restaurant_id || ''))
+          );
 
       if (snapshotCompareMode) {
         pLabel1 = `Restaurant Comparison - ` + (snapshotPeriod === 'custom' ? `Custom Range: ${snapshotCustomDates.from} to ${snapshotCustomDates.to}` : {
@@ -252,7 +258,7 @@ export default function Dashboard() {
       } else if (isComparative) {
         reportHtml = `<div style="font-family:Arial,sans-serif;color:#111827;max-width:800px;margin:0 auto;background:#fff;padding:40px;">
           <h1 style="color:#1e3a5f;margin:0 0 5px 0;">HoneyMoon Group</h1>
-          <p style="color:#6b7280;text-transform:uppercase;font-size:12px;margin:0 0 30px 0;letter-spacing:1px;">Period Snapshot Report${snapshotRestaurant !== 'all' ? ' - Filtered' : ''}</p>
+          <p style="color:#6b7280;text-transform:uppercase;font-size:12px;margin:0 0 30px 0;letter-spacing:1px;">Period Snapshot Report${(effectiveRestId && effectiveRestId !== 'all') ? ` - Filtered: ${restaurants.find(r => String(r.id) === String(effectiveRestId))?.restaurant_name || 'Selected Restaurant'}` : ''}</p>
           
           <table style="width:100%;border-collapse:collapse;margin-bottom:30px;">
             <tr>
@@ -302,7 +308,7 @@ export default function Dashboard() {
 
         reportHtml = `<div style="font-family:Arial,sans-serif;color:#111827;max-width:800px;margin:0 auto;background:#fff;padding:40px;">
           <h1 style="color:#1e3a5f;margin:0 0 5px 0;">HoneyMoon Group</h1>
-          <p style="color:#6b7280;text-transform:uppercase;font-size:12px;margin:0 0 30px 0;letter-spacing:1px;">Period Snapshot Report${snapshotRestaurant !== 'all' ? ' - Filtered' : ''}</p>
+          <p style="color:#6b7280;text-transform:uppercase;font-size:12px;margin:0 0 30px 0;letter-spacing:1px;">Period Snapshot Report${(effectiveRestId && effectiveRestId !== 'all') ? ` - Filtered: ${restaurants.find(r => String(r.id) === String(effectiveRestId))?.restaurant_name || 'Selected Restaurant'}` : ''}</p>
           
           <h2 style="color:#1e40af;margin:0 0 15px 0;font-size:18px;text-transform:uppercase;">${pLabel1}</h2>
           
@@ -359,7 +365,7 @@ export default function Dashboard() {
         <h2>Period Snapshot Report</h2>
         <p>Please find the requested snapshot report attached.</p>
         <p>Period: ${isComparative ? `${pLabel1} vs ${pLabel2}` : pLabel1}</p>
-        ${snapshotRestaurant !== 'all' ? `<p>Filtered by: ${restaurants.find(r => String(r.id) === snapshotRestaurant)?.restaurant_name || 'Selected Restaurant'}</p>` : ''}
+        ${(effectiveRestId && effectiveRestId !== 'all') ? `<p>Filtered by: ${restaurants.find(r => String(r.id) === String(effectiveRestId))?.restaurant_name || 'Selected Restaurant'}</p>` : ''}
         <p>Generated: ${reportTime}</p>
       </div>`;
 
@@ -502,7 +508,13 @@ export default function Dashboard() {
     });
     return () => unsubStaff();
   }, [selectedRestaurant, selectedUser, dateRange, timeRange, isSuper, userData, restaurants, perms, snapshotPeriod, snapshotRestaurant, snapshotCustomDates, snapshotCompareMode]);
-
+  useEffect(() => {
+    if (selectedRestaurant) {
+      setSnapshotRestaurant(selectedRestaurant);
+    } else {
+      setSnapshotRestaurant("all");
+    }
+  }, [selectedRestaurant]);
 
 
   const calculateStaffStats = async (staffList) => {
@@ -678,8 +690,6 @@ export default function Dashboard() {
         restaurant_name: rest?.restaurant_name || s?.restaurant_name || "Unknown Restaurant"
       };
     });
-
-    const autoLogouts = recentActivity.filter(r => r.location_out === "System Auto-Logout");
 
     // Calculate weekly data (last 7 days from the END date)
     const weeklyData = [];
@@ -923,11 +933,6 @@ export default function Dashboard() {
       recent_activity: recentActivity,
       weekly_data: weeklyData,
       cost_metrics: costMetrics,
-      auto_logouts: autoLogouts.sort((a, b) => {
-        const ta = a.clock_out?.toDate ? a.clock_out.toDate() : new Date(a.clock_out);
-        const tb = b.clock_out?.toDate ? b.clock_out.toDate() : new Date(b.clock_out);
-        return tb - ta;
-      }),
       yesterday_clock_outs: yesterdayClockOuts.sort((a, b) => {
         const ta = a.clock_out?.toDate ? a.clock_out.toDate() : new Date(a.clock_out);
         const tb = b.clock_out?.toDate ? b.clock_out.toDate() : new Date(b.clock_out);
@@ -1365,110 +1370,6 @@ export default function Dashboard() {
               </AnimatePresence>
             </div>
 
-            {/* Auto Logouts Dropdown */}
-            <div className="mb-8 bg-[#0b1a3d] border border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-lg">
-              <div
-                onClick={() => setShowAutoLogouts(!showAutoLogouts)}
-                className={`cursor-pointer w-full flex items-center justify-between p-4 sm:p-5 transition-all ${
-                  stats.auto_logouts?.length > 0 ? 'bg-violet-500/10 hover:bg-violet-500/20' : 'bg-white/5 hover:bg-white/10'
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`p-2.5 rounded-xl shrink-0 ${stats.auto_logouts?.length > 0 ? 'bg-violet-500/20 text-violet-400' : 'bg-white/10 text-white/40'}`}>
-                    <ShieldOff size={20} />
-                  </div>
-                  <div className="text-left">
-                    <h3 className={`text-base font-bold mb-0.5 ${stats.auto_logouts?.length > 0 ? 'text-violet-400' : 'text-white/40'}`}>
-                      Auto Logouts ({stats.auto_logouts?.length || 0})
-                    </h3>
-                    <p className="text-xs text-white/60">
-                      {stats.auto_logouts?.length > 0
-                        ? 'Staff members automatically logged out by the system in this period.'
-                        : 'No auto-logouts recorded for this period.'}
-                    </p>
-                  </div>
-                </div>
-                <ChevronDown size={20} className={`transition-transform duration-300 ${stats.auto_logouts?.length > 0 ? 'text-violet-400' : 'text-white/40'} ${showAutoLogouts ? 'rotate-180' : ''}`} />
-              </div>
-
-              <AnimatePresence>
-                {showAutoLogouts && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="border-t border-white/5">
-                      {stats.auto_logouts?.length > 0 ? (
-                        <div className="overflow-x-auto max-h-[400px] custom-scrollbar">
-                          <table className="w-full text-left">
-                            <thead className="bg-white/5 border-b border-white/10 sticky top-0 z-10 backdrop-blur-md">
-                              <tr>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-white/40">Staff Name</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-white/40">Restaurant</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-white/40">Clock In</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-violet-400/70 text-right">Auto Logged Out At</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                              {stats.auto_logouts.map((staff, idx) => (
-                                <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
-                                  <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-violet-400 font-bold text-xs overflow-hidden shrink-0">
-                                        {staff.profile_image ? <img src={staff.profile_image} className="w-full h-full object-cover" /> : staff.full_name?.[0]}
-                                      </div>
-                                      <div>
-                                        <p className="text-sm font-bold text-white">{staff.full_name}</p>
-                                        <p className="text-[10px] text-white/40 mt-0.5">{staff.designation || 'Staff'}</p>
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    <div className="flex items-center gap-2">
-                                      <Store size={14} className="text-white/40" />
-                                      <span className="text-xs font-medium text-white/80">{staff.restaurant_name}</span>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    <div className="flex flex-col">
-                                      <span className="text-xs font-bold text-white/80">
-                                        {staff.clock_in?.toDate ? staff.clock_in.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}
-                                      </span>
-                                      <span className="text-[10px] text-white/40">
-                                        {staff.clock_in?.toDate ? staff.clock_in.toDate().toLocaleDateString('en-GB') : '-'}
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4 text-right">
-                                    <div className="flex flex-col items-end">
-                                      <span className="text-sm font-black text-violet-400 flex items-center gap-2">
-                                        <Clock size={12} className="text-violet-400/50" />
-                                        {staff.clock_out?.toDate ? staff.clock_out.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}
-                                      </span>
-                                      <span className="text-[10px] text-violet-400/50 mt-0.5">
-                                        {staff.clock_out?.toDate ? staff.clock_out.toDate().toLocaleDateString('en-GB') : '-'}
-                                      </span>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <div className="text-center py-8">
-                          <ShieldOff size={32} className="text-white/20 mx-auto mb-3" />
-                          <p className="text-white/40 font-bold">No Data</p>
-                          <p className="text-white/30 text-sm mt-1">There are no auto-logouts for the selected period.</p>
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
               <StatCard
@@ -1645,7 +1546,11 @@ export default function Dashboard() {
                                   {actualOut && (
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                       <div className="w-1.5 h-1.5 rounded-full bg-rose-500/60" />
-                                      <span className="text-white/70 font-mono text-xs">{formatTimeShort(actualOut)}</span>
+                                      <span className="text-white/70 font-mono text-xs">
+                                        {act.location_out === "System Auto-Logout" && (!act.edit_reason || act.edit_reason.trim() === "")
+                                          ? "--"
+                                          : formatTimeShort(actualOut)}
+                                      </span>
                                     </div>
                                   )}
                                   <p className="text-[9px] text-white/25 font-medium mt-0.5">{actualIn.toLocaleDateString()}</p>
@@ -1655,7 +1560,11 @@ export default function Dashboard() {
                                 <span className="text-[#D0B079] font-mono text-sm font-bold">{formatTimeShort(calcIn)}</span>
                               </td>
                               <td className="px-4 py-4">
-                                <span className="text-[#D0B079] font-mono text-sm font-bold">{calcOut ? formatTimeShort(calcOut) : '--:--'}</span>
+                                <span className="text-[#D0B079] font-mono text-sm font-bold">
+                                  {act.location_out === "System Auto-Logout" && (!act.edit_reason || act.edit_reason.trim() === "")
+                                    ? "--"
+                                    : (calcOut ? formatTimeShort(calcOut) : '--:--')}
+                                </span>
                               </td>
                               <td className="px-4 py-4 text-right">
                                 <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
