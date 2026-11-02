@@ -47,6 +47,7 @@ export default function RestaurantProfile() {
     email: "",
     latitude: "",
     longitude: "",
+    geofence_radius: "50",
   });
 
   const [timings, setTimings] = useState([]);
@@ -110,6 +111,7 @@ export default function RestaurantProfile() {
           email: data.restaurant_email ?? "",
           latitude: data.latitude ?? "",
           longitude: data.longitude ?? "",
+          geofence_radius: data.geofence_radius !== undefined ? data.geofence_radius.toString() : "50",
         });
 
         if (data.timings?.length) {
@@ -189,6 +191,7 @@ export default function RestaurantProfile() {
         restaurant_email: info.email,
         latitude: info.latitude,
         longitude: info.longitude,
+        geofence_radius: parseFloat(info.geofence_radius) || 50,
         timings: timings.map(t => ({
           day: t.day,
           opening_time: t.start,
@@ -348,6 +351,22 @@ export default function RestaurantProfile() {
                             className="w-full px-4 py-3 bg-white/[0.02] border border-white/[0.05] rounded-xl text-[#D0B079]/70 text-xs font-mono focus:outline-none cursor-default"
                           />
                         </div>
+                      </div>
+                      <div className="space-y-2 pt-2">
+                        <label className="text-sm font-medium text-white/70 ml-1 flex items-center justify-between">
+                          <span>Geofence Radius (meters)</span>
+                          <span className="text-xs text-[#D0B079]/70 font-mono">Dynamic auto logout boundary</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="10"
+                          max="5000"
+                          value={info.geofence_radius}
+                          onChange={onInfoChange("geofence_radius")}
+                          placeholder="50"
+                          className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl text-white font-medium placeholder-white/20 focus:outline-none focus:border-[#D0B079]/40 text-sm"
+                        />
+                        <p className="text-[11px] text-white/40 ml-1">Staff clocked in must remain within this radius; moving beyond it triggers automatic logout.</p>
                       </div>
                     </div>
                   </div>

@@ -65,6 +65,9 @@ export const AuthProvider = ({ children }) => {
               if (roleDoc.exists()) {
                 const roleData = roleDoc.data();
                 perms = roleData.permission_ids || roleData.permissions || [];
+                if (!data.role_title && roleData.title) {
+                  data.role_title = roleData.title;
+                }
               }
             }
           } else {

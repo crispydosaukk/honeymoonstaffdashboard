@@ -16,10 +16,9 @@ const Item = ({ to = "#", icon, label }) => (
     className={({ isActive }) =>
       `flex items-center gap-3 px-4 py-2.5 rounded-xl text-[15px] font-medium tracking-wide
       transition-all duration-200 group relative
-      ${
-        isActive
-          ? "bg-[#D0B079]/15 text-[#D0B079] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full before:bg-[#D0B079]"
-          : "text-white/85 hover:bg-white/8 hover:text-white"
+      ${isActive
+        ? "bg-[#D0B079]/15 text-[#D0B079] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full before:bg-[#D0B079]"
+        : "text-white/85 hover:bg-white/8 hover:text-white"
       }`
     }
   >
@@ -98,6 +97,7 @@ export default function Sidebar({ open, onClose }) {
       { label: "Staff Management", to: "/staff", icon: iconUsers(), perm: "staff_management" },
       { label: "Notifications", to: "/notifications", icon: iconBell(), perm: "notifications" },
       { label: "Auto Logouts", to: "/autologouts", icon: <ShieldOff className="w-full h-full" strokeWidth={1.6} />, perm: "auto_logouts" },
+      { label: "Settings", to: "/settings", icon: iconSettings(), perm: "access" },
     ],
     []
   );
@@ -149,7 +149,7 @@ export default function Sidebar({ open, onClose }) {
         className={`fixed inset-0 z-[55] bg-black/60 backdrop-blur-md lg:hidden transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
       />
- 
+
       <aside
         className={`
           fixed left-0 top-0 bottom-0 z-[60] w-[300px]
@@ -163,8 +163,8 @@ export default function Sidebar({ open, onClose }) {
         {/* Mobile Sidebar Header (Logo + Close) */}
         <div className="flex lg:hidden items-center justify-between px-6 pb-6 pt-12 border-b border-white/5">
           <img src="/honeymoonstafflogo.png" alt="Logo" className="h-12 w-auto object-contain" />
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="p-2.5 text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-2xl transition-all active:scale-90"
           >
             <X size={20} />
@@ -175,7 +175,7 @@ export default function Sidebar({ open, onClose }) {
         <div className="px-3 py-3 border-b border-white/[0.06]">
           <div className="relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             <input
               type="search"
@@ -243,9 +243,9 @@ export default function Sidebar({ open, onClose }) {
             style={{ background: 'rgba(255,255,255,0.06)' }}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16 17 21 12 16 7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
             Logout
           </button>
@@ -328,6 +328,15 @@ function iconBell() {
     <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="18" cy="8" r="2" fill="currentColor" className="text-[#D0B079]" />
+    </svg>
+  );
+}
+
+function iconSettings() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

@@ -9,8 +9,8 @@ export function getPerms() {
   }
 }
 
-// New helper: get logged-in user
-function getUser() {
+// Helper: get logged-in user
+export function getUser() {
   try {
     return JSON.parse(localStorage.getItem("user") || "{}");
   } catch {
@@ -18,25 +18,43 @@ function getUser() {
   }
 }
 
+export function isSuperAdmin(passedUser, passedPerms) {
+  const user = passedUser || getUser();
+  const perms = (passedPerms || getPerms() || []).map(p => String(p).toLowerCase());
+
+  const roleTitle = String(user?.role_title || user?.role || user?.role?.title || "").toLowerCase().trim();
+  const normalizedRole = roleTitle.replace(/[\s_-]+/g, "");
+
+  return Boolean(
+    user?.role_id === 6 ||
+    user?.role_id === "6" ||
+    normalizedRole === "superadmin" ||
+    user?.is_super_admin === true ||
+    user?.isSuper === true ||
+    perms.includes("access") ||
+    perms.includes("super_admin") ||
+    perms.includes("superadmin")
+  );
+}
+
 export function can(required, passedUser, passedPerms) {
   if (!required) return true;
 
   const user = passedUser || getUser();
   const perms = (passedPerms || getPerms() || []).map(p => String(p).toLowerCase());
-  
+
   // 🔥 SUPER ADMIN BYPASS
-  const isSuper = (
-    user?.role_id === 6 || 
-    user?.role_id === "6" ||
-    (user?.role_title && String(user.role_title).toLowerCase().trim() === "super admin") ||
-    (user?.role && typeof user.role === 'string' && user.role.toLowerCase().trim() === "super admin") ||
-    (user?.role?.title && String(user.role.title).toLowerCase().trim() === "super admin")
-  );
+  if (isSuperAdmin(user, perms)) return true;
 
-  const hasPerm = perms.includes(String(required).toLowerCase());
-  return isSuper || hasPerm;
+  const req = String(required).toLowerCase();
+
+  // Settings and Access Control modules are strictly for Super Admin only
+  if (req === "access" || req === "settings") {
+    return false;
+  }
+
+  return perms.includes(req);
 }
-
 
 /**
  * Returns the first route the user has permission for.
@@ -45,21 +63,12 @@ export function can(required, passedUser, passedPerms) {
  */
 export function getSafePath(passedUser, passedPerms) {
   const user = passedUser || getUser();
-  
-  // 🔥 SUPER ADMIN BYPASS
-  const isSuper = (
-    user?.role_id === 6 || 
-    user?.role_id === "6" ||
-    user?.role_title?.toLowerCase()?.trim() === "super admin" ||
-    user?.role?.toLowerCase()?.trim() === "super admin" ||
-    user?.role?.title?.toLowerCase()?.trim() === "super admin"
-  );
+  const perms = (passedPerms || getPerms() || []).map(p => String(p).toLowerCase());
 
-  if (isSuper) {
+  // 🔥 SUPER ADMIN BYPASS
+  if (isSuperAdmin(user, perms)) {
     return "/dashboard";
   }
-
-  const perms = (passedPerms || getPerms() || []).map(p => String(p).toLowerCase());
 
   const map = [
     { perm: "dashboard", path: "/dashboard" },
@@ -68,7 +77,6 @@ export function getSafePath(passedUser, passedPerms) {
     { perm: "notifications", path: "/notifications" },
     { perm: "auto_logouts", path: "/autologouts" },
     { perm: "restaurant", path: "/restuarent" },
-    { perm: "access", path: "/access" },
   ];
 
   for (const item of map) {
@@ -79,5 +87,3 @@ export function getSafePath(passedUser, passedPerms) {
 
   return "/login"; // fallback if no perms at all
 }
-
-
