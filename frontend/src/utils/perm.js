@@ -48,11 +48,12 @@ export function can(required, passedUser, passedPerms) {
 
   const req = String(required).toLowerCase();
 
-  // Settings and Access Control modules are strictly for Super Admin only
-  if (req === "access" || req === "settings") {
+  // Access Control management (/access, /access/roles, /access/users) is strictly Super Admin only
+  if (req === "access") {
     return false;
   }
 
+  // Check if the permission (e.g. "settings", "all_staff", etc.) is assigned to this role in Access Control
   return perms.includes(req);
 }
 
@@ -77,6 +78,7 @@ export function getSafePath(passedUser, passedPerms) {
     { perm: "notifications", path: "/notifications" },
     { perm: "auto_logouts", path: "/autologouts" },
     { perm: "restaurant", path: "/restuarent" },
+    { perm: "settings", path: "/settings" },
   ];
 
   for (const item of map) {

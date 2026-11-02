@@ -136,7 +136,7 @@ export default function App() {
           path="/settings"
           element={
             <PrivateRoute>
-              <RequirePerm perm="access"><Settings /></RequirePerm>
+              <RequirePerm perm="settings"><Settings /></RequirePerm>
             </PrivateRoute>
           }
         />
@@ -144,7 +144,7 @@ export default function App() {
           path="/setttings"
           element={
             <PrivateRoute>
-              <RequirePerm perm="access"><Settings /></RequirePerm>
+              <RequirePerm perm="settings"><Settings /></RequirePerm>
             </PrivateRoute>
           }
         />

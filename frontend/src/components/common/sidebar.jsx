@@ -97,7 +97,7 @@ export default function Sidebar({ open, onClose }) {
       { label: "Staff Management", to: "/staff", icon: iconUsers(), perm: "staff_management" },
       { label: "Notifications", to: "/notifications", icon: iconBell(), perm: "notifications" },
       { label: "Auto Logouts", to: "/autologouts", icon: <ShieldOff className="w-full h-full" strokeWidth={1.6} />, perm: "auto_logouts" },
-      { label: "Settings", to: "/settings", icon: iconSettings(), perm: "access" },
+      { label: "Settings", to: "/settings", icon: iconSettings(), perm: "settings" },
     ],
     []
   );

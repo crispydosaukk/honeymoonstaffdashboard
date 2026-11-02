@@ -38,6 +38,19 @@ export default function AccessManagement() {
     return () => unsubscribe();
   }, []);
 
+  // Sync Settings permission to DB so it is always available in Access Control
+  useEffect(() => {
+    if (!loading && permissions.length > 0) {
+      const hasSettings = permissions.find(p => p.id === "settings" || p.title?.toLowerCase() === "settings");
+      if (!hasSettings) {
+        setDoc(doc(db, "permissions", "settings"), {
+          title: "Settings",
+          created_at: new Date()
+        }).catch(console.error);
+      }
+    }
+  }, [loading, permissions]);
+
   async function handleCreate() {
     if (!title.trim()) { setError("Title is required"); return; }
     try {
